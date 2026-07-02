@@ -422,7 +422,10 @@ function getMA(){
   if(!v){showToast('⚠️ Bitte zuerst Mitarbeiter auswählen');return null}
   return v;
 }
-document.getElementById('ma').addEventListener('change',()=>refreshStempelUI());
+document.getElementById('ma').addEventListener('change',()=>{
+  refreshStempelUI();
+  renderEntries();
+});
 
 // ── STEMPELUHR ────────────────────────────────────────────────────────────────
 function getTodayEntry(name){
@@ -528,7 +531,7 @@ function confirmPause(useLegal){
 }
 
 function refreshStempelUI(){
-  const name=document.getElementById('ma').value;
+  const name=getMA();
   if(!name) return;
   const today=new Date().toISOString().split('T')[0];
   const e=entries.find(x=>x.name===name && x.date===today);
@@ -588,7 +591,7 @@ function refreshStempelUI(){
 
 // ── WEEK ──────────────────────────────────────────────────────────────────────
 function renderWeek(){
-  const name=document.getElementById('ma').value;
+  const name=getMA();
   const card=document.getElementById('weekCard');
   const today=new Date();
   const mon=new Date(today); mon.setDate(today.getDate()-((today.getDay()+6)%7));
