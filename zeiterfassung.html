@@ -333,8 +333,7 @@ function befuelleDropdowns() {
   });
 }
 
-// Beim Laden der App Mitarbeiterliste holen
-ladeMitarbeiter();
+// ladeMitarbeiter() wird weiter unten aufgerufen nach webhookUrl Definition
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
 // Entry shape: { id, name, date, type:'work'|'Urlaub'|'Krank', start, end, pause, net, note }
@@ -343,6 +342,9 @@ let entries = safeGet('gh3_entries', []);
 // Webhook URL — direkt eingebaut, kein Setup nötig
 let webhookUrl = 'https://script.google.com/macros/s/AKfycbw1AOqcgtunqJpDKU59VTJkn5TWr1xMip90EA5iOYf-FdcOASCcocZRMqO4IRPicCZf/exec';
 try{webhookUrl=localStorage.getItem('gh3_webhook')||webhookUrl}catch(e){}
+
+// Mitarbeiterliste laden (nach webhookUrl Definition)
+ladeMitarbeiter();
 let editIdx = null, pendingDelIdx = null, rangeType = 'Urlaub';
 
 // ── PAUSE GESETZ ─────────────────────────────────────────────────────────────
