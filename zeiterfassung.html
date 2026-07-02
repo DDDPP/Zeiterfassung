@@ -127,16 +127,7 @@
   </div>
   <div class="name-row">
     <label for="ma">Mitarbeiter:</label>
-    <select id="ma">
-      <option value="">– auswählen –</option>
-      <option>Abdaqadir Rso</option>
-      <option>Ziad Owayed</option>
-      <option>Marcel Rollus</option>
-      <option>Majid Haghshenas</option>
-      <option>Domenico Rigliaco</option>
-      <option>Testperson1</option>
-      <option>Testperson2</option>
-    </select>
+    <select id="ma"><option value="">– auswählen –</option></select>
   </div>
 </div>
 
@@ -202,9 +193,7 @@
     <div class="fgroup">
       <label class="flabel">Mitarbeiter</label>
       <select class="finput" id="eName">
-        <option>Abdaqadir Rso</option><option>Ziad Owayed</option>
-        <option>Marcel Rollus</option><option>Majid Haghshenas</option>
-        <option>Domenico Rigliaco</option><option>Testperson1</option><option>Testperson2</option>
+        <!-- wird dynamisch befüllt -->
       </select>
     </div>
     <div class="fgroup">
@@ -315,6 +304,33 @@
 // ── HELPERS ──────────────────────────────────────────────────────────────────
 function safeGet(k,fb){try{return JSON.parse(localStorage.getItem(k))??fb}catch(e){return fb}}
 function safeSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ✏️  MITARBEITER HIER PFLEGEN — nur diese Liste anpassen!
+// ══════════════════════════════════════════════════════════════════════════════
+const MITARBEITER = [
+  "Abdaqadir Rso",
+  "Ziad Owayed",
+  "Marcel Rollus",
+  "Majid Haghshenas",
+  "Domenico Rigliaco",
+  "Testperson1",
+  "Testperson2"
+];
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Dropdowns dynamisch befüllen
+function befuelleDropdowns() {
+  const selMA = document.getElementById('ma');
+  const selEdit = document.getElementById('eName');
+  selMA.innerHTML = '<option value="">– auswählen –</option>';
+  selEdit.innerHTML = '';
+  MITARBEITER.forEach(name => {
+    selMA.innerHTML += `<option>${name}</option>`;
+    selEdit.innerHTML += `<option>${name}</option>`;
+  });
+}
+befuelleDropdowns();
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
 // Entry shape: { id, name, date, type:'work'|'Urlaub'|'Krank', start, end, pause, net, note }
@@ -632,7 +648,7 @@ function openAddModal(){
   editIdx=null;
   const name=document.getElementById('ma').value;
   document.getElementById('modalTitle').textContent='Arbeitstag hinzufügen';
-  document.getElementById('eName').value=name||'Abdaqadir Rso';
+  document.getElementById('eName').value=name||MITARBEITER[0];
   document.getElementById('eDate').value=new Date().toISOString().split('T')[0];
   document.getElementById('eStart').value='';
   document.getElementById('eEnd').value='';
