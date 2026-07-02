@@ -622,8 +622,16 @@ function renderWeek(){
 // ── EINTRAEGE RENDER ─────────────────────────────────────────────────────────
 function renderEntries(){
   const list=document.getElementById('entriesList');
-  if(!entries.length){list.innerHTML='<div class="empty-state">Noch keine Einträge.</div>';return}
-  list.innerHTML=entries.map((e,i)=>{
+  // Wenn persönlicher Link: nur eigene Einträge zeigen
+  const params = new URLSearchParams(window.location.search);
+  const maParam = params.get('ma');
+  const gefilterteEntries = maParam
+    ? entries.filter(e => e.name === maParam)
+    : entries;
+  if(!gefilterteEntries.length){list.innerHTML='<div class="empty-state">Noch keine Einträge.</div>';return}
+  list.innerHTML=gefilterteEntries.map((e,i)=>{
+    const origIdx = entries.indexOf(e);
+    i = origIdx;
     const isWork=e.type==='work';
     const icon=e.type==='Urlaub'?'🏖️':e.type==='Krank'?'🤒':e.end?'🟢':'⏳';
     const tagCls=isWork?'tag-work':e.type==='Urlaub'?'tag-urlaub':'tag-krank';
