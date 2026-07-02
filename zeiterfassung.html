@@ -331,7 +331,7 @@ async function ladeMitarbeiter() {
       if (maParam) {
         const sel = document.getElementById('ma');
         for (let i = 0; i < sel.options.length; i++) {
-          if (sel.options[i].value === maParam) {
+          if (sel.options[i].text === maParam || sel.options[i].value === maParam) {
             sel.selectedIndex = i;
             refreshStempelUI();
             break;
