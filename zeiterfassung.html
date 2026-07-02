@@ -305,21 +305,23 @@
 function safeGet(k,fb){try{return JSON.parse(localStorage.getItem(k))??fb}catch(e){return fb}}
 function safeSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 
-// ══════════════════════════════════════════════════════════════════════════════
-// ✏️  MITARBEITER HIER PFLEGEN — nur diese Liste anpassen!
-// ══════════════════════════════════════════════════════════════════════════════
-const MITARBEITER = [
-  "Abdaqadir Rso",
-  "Ziad Owayed",
-  "Marcel Rollus",
-  "Majid Haghshenas",
-  "Domenico Rigliaco",
-  "Testperson1",
-  "Testperson2"
-];
-// ══════════════════════════════════════════════════════════════════════════════
+// Mitarbeiterliste wird automatisch aus Google Sheets geladen
+let MITARBEITER = [];
 
-// Dropdowns dynamisch befüllen
+async function ladeMitarbeiter() {
+  try {
+    const url = webhookUrl + "?action=mitarbeiter";
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.mitarbeiter && data.mitarbeiter.length > 0) {
+      MITARBEITER = data.mitarbeiter;
+      befuelleDropdowns();
+    }
+  } catch(e) {
+    console.warn("Mitarbeiterliste konnte nicht geladen werden:", e);
+  }
+}
+
 function befuelleDropdowns() {
   const selMA = document.getElementById('ma');
   const selEdit = document.getElementById('eName');
@@ -330,7 +332,9 @@ function befuelleDropdowns() {
     selEdit.innerHTML += `<option>${name}</option>`;
   });
 }
-befuelleDropdowns();
+
+// Beim Laden der App Mitarbeiterliste holen
+ladeMitarbeiter();
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
 // Entry shape: { id, name, date, type:'work'|'Urlaub'|'Krank', start, end, pause, net, note }
