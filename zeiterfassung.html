@@ -413,6 +413,11 @@ function showTab(n){
 
 // ── GET MA ────────────────────────────────────────────────────────────────────
 function getMA(){
+  // Erst URL-Parameter prüfen (persönlicher Link)
+  const params = new URLSearchParams(window.location.search);
+  const maParam = params.get('ma');
+  if(maParam) return maParam;
+  // Sonst Dropdown
   const v=document.getElementById('ma').value;
   if(!v){showToast('⚠️ Bitte zuerst Mitarbeiter auswählen');return null}
   return v;
