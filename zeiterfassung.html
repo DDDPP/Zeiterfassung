@@ -796,7 +796,23 @@ function showToast(msg){
 });
 
 // Init
-ladeMitarbeiter();
+ladeMitarbeiter().then(() => {
+  // Name aus URL-Parameter lesen z.B. ?ma=Ziad Owayed
+  const params = new URLSearchParams(window.location.search);
+  const maParam = params.get('ma');
+  if (maParam) {
+    const sel = document.getElementById('ma');
+    // Suche nach dem Namen im Dropdown
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === maParam) {
+        sel.selectedIndex = i;
+        // Status aktualisieren
+        refreshStempelUI();
+        break;
+      }
+    }
+  }
+});
 renderEntries();
 </script>
 </body>
