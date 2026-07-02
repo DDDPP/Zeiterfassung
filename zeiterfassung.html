@@ -325,6 +325,19 @@ async function ladeMitarbeiter() {
     if (data.mitarbeiter && data.mitarbeiter.length > 0) {
       MITARBEITER = data.mitarbeiter;
       befuelleDropdowns();
+      // Nach dem Befüllen: URL-Parameter prüfen und Mitarbeiter vorauswählen
+      const params = new URLSearchParams(window.location.search);
+      const maParam = params.get('ma');
+      if (maParam) {
+        const sel = document.getElementById('ma');
+        for (let i = 0; i < sel.options.length; i++) {
+          if (sel.options[i].value === maParam) {
+            sel.selectedIndex = i;
+            refreshStempelUI();
+            break;
+          }
+        }
+      }
     }
   } catch(e) {
     console.warn("Mitarbeiterliste konnte nicht geladen werden:", e);
@@ -796,23 +809,7 @@ function showToast(msg){
 });
 
 // Init
-ladeMitarbeiter().then(() => {
-  // Name aus URL-Parameter lesen z.B. ?ma=Ziad Owayed
-  const params = new URLSearchParams(window.location.search);
-  const maParam = params.get('ma');
-  if (maParam) {
-    const sel = document.getElementById('ma');
-    // Suche nach dem Namen im Dropdown
-    for (let i = 0; i < sel.options.length; i++) {
-      if (sel.options[i].value === maParam) {
-        sel.selectedIndex = i;
-        // Status aktualisieren
-        refreshStempelUI();
-        break;
-      }
-    }
-  }
-});
+ladeMitarbeiter();
 renderEntries();
 </script>
 </body>
