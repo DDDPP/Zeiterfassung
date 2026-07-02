@@ -305,12 +305,15 @@
 function safeGet(k,fb){try{return JSON.parse(localStorage.getItem(k))??fb}catch(e){return fb}}
 function safeSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 
+// Webhook URL — ganz oben definiert damit alles drauf zugreifen kann
+const WEBHOOK_BASE = 'https://script.google.com/macros/s/AKfycbw1AOqcgtunqJpDKU59VTJkn5TWr1xMip90EA5iOYf-FdcOASCcocZRMqO4IRPicCZf/exec';
+
 // Mitarbeiterliste wird automatisch aus Google Sheets geladen
 let MITARBEITER = [];
 
 async function ladeMitarbeiter() {
   try {
-    const url = webhookUrl + "?action=mitarbeiter";
+    const url = WEBHOOK_BASE + "?action=mitarbeiter";
     const res = await fetch(url);
     const data = await res.json();
     if (data.mitarbeiter && data.mitarbeiter.length > 0) {
@@ -333,18 +336,11 @@ function befuelleDropdowns() {
   });
 }
 
-// ladeMitarbeiter() wird weiter unten aufgerufen nach webhookUrl Definition
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
-// Entry shape: { id, name, date, type:'work'|'Urlaub'|'Krank', start, end, pause, net, note }
-// pause & net are in minutes (computed, not entered manually)
 let entries = safeGet('gh3_entries', []);
-// Webhook URL — direkt eingebaut, kein Setup nötig
-let webhookUrl = 'https://script.google.com/macros/s/AKfycbw1AOqcgtunqJpDKU59VTJkn5TWr1xMip90EA5iOYf-FdcOASCcocZRMqO4IRPicCZf/exec';
+let webhookUrl = WEBHOOK_BASE;
 try{webhookUrl=localStorage.getItem('gh3_webhook')||webhookUrl}catch(e){}
-
-// Mitarbeiterliste laden (nach webhookUrl Definition)
-ladeMitarbeiter();
 let editIdx = null, pendingDelIdx = null, rangeType = 'Urlaub';
 
 // ── PAUSE GESETZ ─────────────────────────────────────────────────────────────
@@ -794,6 +790,7 @@ function showToast(msg){
 });
 
 // Init
+ladeMitarbeiter();
 renderEntries();
 </script>
 </body>
