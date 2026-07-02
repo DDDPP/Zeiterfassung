@@ -341,7 +341,7 @@ ladeMitarbeiter();
 // pause & net are in minutes (computed, not entered manually)
 let entries = safeGet('gh3_entries', []);
 // Webhook URL — direkt eingebaut, kein Setup nötig
-let webhookUrl = 'https://script.google.com/macros/s/AKfycbxk6RbSgQp3nlbzC7EkyLjNqKjQhH720F0tWeb7D9FDLZPp-e-CS08ZH2sHUR2ntIOO/exec';
+let webhookUrl = 'https://script.google.com/macros/s/AKfycbw1AOqcgtunqJpDKU59VTJkn5TWr1xMip90EA5iOYf-FdcOASCcocZRMqO4IRPicCZf/exec';
 try{webhookUrl=localStorage.getItem('gh3_webhook')||webhookUrl}catch(e){}
 let editIdx = null, pendingDelIdx = null, rangeType = 'Urlaub';
 
