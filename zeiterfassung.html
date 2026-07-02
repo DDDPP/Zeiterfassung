@@ -273,6 +273,11 @@
       <input type="number" class="finput" id="pauseInput" min="0" max="480" step="5" placeholder="z.B. 45">
     </div>
     <div style="font-size:12px;color:var(--muted);margin-top:-8px;margin-bottom:14px" id="pauseLegalHint"></div>
+    <!-- Notiz -->
+    <div class="fgroup">
+      <label class="flabel">Was hast du heute gemacht? <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+      <input type="text" class="finput" id="pauseNote" placeholder="z.B. Kunde Müller, Lagerhaltung, Baustelle X...">
+    </div>
     <div class="mactions">
       <button class="btn-secondary" onclick="confirmPause(true)">Mindestpause</button>
       <button class="btn-primary" onclick="confirmPause(false)">✓ Speichern</button>
@@ -455,18 +460,22 @@ function confirmPause(useLegal){
   } else {
     const val=parseInt(document.getElementById('pauseInput').value)||0;
     const legal=legalPause(rawMins);
-    // Warnung wenn unter gesetzlicher Pause, aber trotzdem speichern
     if(val<legal && legal>0){
       showToast(`⚠️ Achtung: Unter gesetzlicher Mindestpause (${legal} Min)`);
     }
     pauseMins=Math.max(0,val);
   }
   const netMins=Math.max(0,rawMins-pauseMins);
+  // Notiz aus dem Feld auslesen
+  const notiz=document.getElementById('pauseNote').value.trim();
   entries[gehenIdx].end=gehenEnd;
   entries[gehenIdx].pause=pauseMins;
   entries[gehenIdx].net=netMins;
+  if(notiz) entries[gehenIdx].note=notiz;
   save(); sendToSheet(entries[gehenIdx]);
   document.getElementById('pauseModal').classList.add('hidden');
+  // Notizfeld leeren für nächstes Mal
+  document.getElementById('pauseNote').value='';
   gehenIdx=null; gehenEnd=null;
   refreshStempelUI();
   showToast(`🔴 Feierabend! Pause: ${pauseMins} Min · Arbeitszeit: ${fmtMins(netMins)}`);
