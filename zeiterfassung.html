@@ -172,10 +172,7 @@
     <button class="abtn btn-krank" onclick="openRangeModal('Krank')"><span class="ai">🤒</span>Krank</button>
   </div>
 
-  <div class="sheet-hint">
-    <div class="shi">📊</div>
-    <div><b>Daten in Google Sheets speichern</b>Trag deinen Webhook ein, damit alle Einträge automatisch gespeichert werden.<span class="sheet-link" onclick="openSheetModal()">⚙️ Jetzt einrichten →</span></div>
-  </div>
+
 </div>
 
 <!-- WOCHE -->
@@ -323,8 +320,9 @@ function safeSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 // Entry shape: { id, name, date, type:'work'|'Urlaub'|'Krank', start, end, pause, net, note }
 // pause & net are in minutes (computed, not entered manually)
 let entries = safeGet('gh3_entries', []);
-let webhookUrl = '';
-try{webhookUrl=localStorage.getItem('gh3_webhook')||''}catch(e){}
+// Webhook URL — direkt eingebaut, kein Setup nötig
+let webhookUrl = 'https://script.google.com/macros/s/AKfycbxk6RbSgQp3nlbzC7EkyLjNqKjQhH720F0tWeb7D9FDLZPp-e-CS08ZH2sHUR2ntIOO/exec';
+try{webhookUrl=localStorage.getItem('gh3_webhook')||webhookUrl}catch(e){}
 let editIdx = null, pendingDelIdx = null, rangeType = 'Urlaub';
 
 // ── PAUSE GESETZ ─────────────────────────────────────────────────────────────
