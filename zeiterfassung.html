@@ -205,6 +205,9 @@
     <div class="fgroup">
       <label class="flabel">Datum</label>
       <input type="date" class="finput" id="eDate">
+      <div id="datumHinweis" style="font-size:11px;color:var(--orange);margin-top:4px;display:none">
+        ⚠️ Nur aktueller und vorheriger Monat erlaubt
+      </div>
     </div>
     <div class="frow">
       <div class="fgroup"><label class="flabel">Beginn</label><input type="time" class="finput" id="eStart"></div>
@@ -662,7 +665,7 @@ function renderEntries(){
         <span class="etag ${tagCls}">${tagTxt}</span>
         <div class="entry-actions">
           <button class="ibtn" onclick="openEditModal(${i})">✏️</button>
-          <button class="ibtn" onclick="deleteEntry(${i})">🗑</button>
+          <button class="ibtn ibtn-delete" onclick="deleteEntry(${i})">🗑</button>
         </div>
       </div>
       ${timesHTML}
@@ -680,6 +683,13 @@ function openEditModal(idx){
   const e=entries[idx];
   document.getElementById('modalTitle').textContent='Eintrag bearbeiten';
   document.getElementById('eName').value=e.name;
+  // Bei persönlichem Link: Mitarbeiter-Dropdown im Modal sperren
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('ma')) {
+    document.getElementById('eName').disabled = true;
+  } else {
+    document.getElementById('eName').disabled = false;
+  }
   document.getElementById('eDate').value=e.date;
   document.getElementById('eStart').value=e.start||'';
   document.getElementById('eEnd').value=e.end||'';
@@ -692,6 +702,13 @@ function openAddModal(){
   const name=getMA();
   document.getElementById('modalTitle').textContent='Arbeitstag hinzufügen';
   document.getElementById('eName').value=name||MITARBEITER[0];
+  // Bei persönlichem Link: Mitarbeiter-Dropdown im Modal sperren
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('ma')) {
+    document.getElementById('eName').disabled = true;
+  } else {
+    document.getElementById('eName').disabled = false;
+  }
   document.getElementById('eDate').value=new Date().toISOString().split('T')[0];
   document.getElementById('eStart').value='';
   document.getElementById('eEnd').value='';
@@ -717,20 +734,67 @@ function updateCalcDisplay(){
 }
 document.getElementById('eStart').addEventListener('change',updateCalcDisplay);
 document.getElementById('eEnd').addEventListener('change',updateCalcDisplay);
+document.getElementById('eDate').addEventListener('change',function(){
+  const hinweis = document.getElementById('datumHinweis');
+  if(hinweis) hinweis.style.display = isDatumErlaubt(this.value) ? 'none' : 'block';
+});
+
+function isDatumErlaubt(dateStr) {
+  // Nur aktueller Monat und Vormonat erlaubt für Mitarbeiter
+  const params = new URLSearchParams(window.location.search);
+  if (!params.get('ma')) return true; // Chef darf alles
+  
+  const datum = new Date(dateStr + 'T12:00:00');
+  const heute = new Date();
+  
+  // Aktueller Monat
+  const aktMonat = heute.getMonth();
+  const aktJahr = heute.getFullYear();
+  
+  // Vormonat
+  const vorMonat = aktMonat === 0 ? 11 : aktMonat - 1;
+  const vorJahr = aktMonat === 0 ? aktJahr - 1 : aktJahr;
+  
+  const dMonat = datum.getMonth();
+  const dJahr = datum.getFullYear();
+  
+  return (dMonat === aktMonat && dJahr === aktJahr) ||
+         (dMonat === vorMonat && dJahr === vorJahr);
+}
 
 function saveEntry(){
   const s=document.getElementById('eStart').value;
   const en=document.getElementById('eEnd').value;
+  const dateVal=document.getElementById('eDate').value;
+  
+  // Zeitraum-Prüfung für Mitarbeiter
+  if(!isDatumErlaubt(dateVal)){
+    const heute = new Date();
+    const vorMonat = heute.getMonth() === 0 ? 12 : heute.getMonth();
+    const vorJahr = heute.getMonth() === 0 ? heute.getFullYear()-1 : heute.getFullYear();
+    showToast(`⚠️ Nur aktueller und vorheriger Monat erlaubt`);
+    return;
+  }
+  
   const calc=s&&en?calcEntry(s,en):null;
+  
+  // Nachträglicher Vermerk wenn Eintrag nicht von heute ist
+  const heute = new Date().toISOString().split('T')[0];
+  let notiz = document.getElementById('eNote').value;
+  if (dateVal !== heute) {
+    const vermerk = `⚠️ Nachgetragen am ${new Date().toLocaleDateString('de-DE')}`;
+    notiz = notiz ? `${notiz} | ${vermerk}` : vermerk;
+  }
+  
   const entry={
     id:editIdx!==null?entries[editIdx].id:Date.now(),
     name:document.getElementById('eName').value,
-    date:document.getElementById('eDate').value,
+    date:dateVal,
     type:'work',
     start:s||null, end:en||null,
     pause:calc?calc.pauseMins:null,
     net:calc?calc.netMins:null,
-    note:document.getElementById('eNote').value
+    note:notiz
   };
   if(editIdx!==null){entries[editIdx]=entry;showToast('✅ Eintrag aktualisiert')}
   else{entries.unshift(entry);showToast('✅ Eintrag hinzugefügt')}
@@ -838,12 +902,9 @@ renderEntries();
 (function() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('ma')) {
-    // Add-Button ausblenden
-    const addBtn = document.getElementById('addBtn');
-    if (addBtn) addBtn.style.display = 'none';
-    // Edit/Delete Buttons in Einträgen via CSS ausblenden
+    // Nur Löschen-Button ausblenden, Bearbeiten bleibt sichtbar
     const style = document.createElement('style');
-    style.textContent = '.entry-actions { display: none !important; }';
+    style.textContent = '.ibtn-delete { display: none !important; }';
     document.head.appendChild(style);
   }
 })();
