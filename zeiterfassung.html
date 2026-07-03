@@ -184,7 +184,7 @@
   <br>
   <div class="section-hdr">
     <div class="section-title">Alle Einträge</div>
-    <button class="add-btn" onclick="openAddModal()">+ Hinzufügen</button>
+    <button class="add-btn" onclick="openAddModal()" id="addBtn">+ Hinzufügen</button>
   </div>
   <div class="entries-card" id="entriesList"></div>
 </div>
@@ -442,7 +442,7 @@ function doKommen(){
   const entry={id:Date.now(),name,date:today,type:'work',start:now,end:null,pause:null,net:null,note:''};
   entries.unshift(entry);
   save(); sendToSheet(entry);
-  refreshStempelUI();
+  setTimeout(()=>refreshStempelUI(), 100);
   showToast('🟢 Kommen gestempelt – '+now);
 }
 let gehenIdx = null, gehenEnd = null;
@@ -526,7 +526,7 @@ function confirmPause(useLegal){
   // Notizfeld leeren für nächstes Mal
   document.getElementById('pauseNote').value='';
   gehenIdx=null; gehenEnd=null;
-  refreshStempelUI();
+  setTimeout(()=>refreshStempelUI(), 100);
   showToast(`🔴 Feierabend! Pause: ${pauseMins} Min · Arbeitszeit: ${fmtMins(netMins)}`);
 }
 
@@ -689,7 +689,7 @@ function openEditModal(idx){
 }
 function openAddModal(){
   editIdx=null;
-  const name=document.getElementById('ma').value;
+  const name=getMA();
   document.getElementById('modalTitle').textContent='Arbeitstag hinzufügen';
   document.getElementById('eName').value=name||MITARBEITER[0];
   document.getElementById('eDate').value=new Date().toISOString().split('T')[0];
@@ -833,6 +833,20 @@ function showToast(msg){
 // Init
 ladeMitarbeiter();
 renderEntries();
+
+// Wenn persönlicher Link: Bearbeiten/Hinzufügen ausblenden
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('ma')) {
+    // Add-Button ausblenden
+    const addBtn = document.getElementById('addBtn');
+    if (addBtn) addBtn.style.display = 'none';
+    // Edit/Delete Buttons in Einträgen via CSS ausblenden
+    const style = document.createElement('style');
+    style.textContent = '.entry-actions { display: none !important; }';
+    document.head.appendChild(style);
+  }
+})();
 </script>
 </body>
 </html>
