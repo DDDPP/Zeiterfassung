@@ -433,22 +433,63 @@ document.getElementById('ma').addEventListener('change',()=>{
 // ── STEMPELUHR ────────────────────────────────────────────────────────────────
 function getTodayEntry(name){
   const today=new Date().toISOString().split('T')[0];
-  return entries.find(e=>e.name===name && e.date===today);
+  return entries.find(e=>e.name===name && e.date===today && e.type==='work');
+}
+function getTodayOpenShift(name){
+  // Gibt den Tageseintrag zurück wenn eine Schicht noch offen ist
+  const e=getTodayEntry(name);
+  if(!e) return null;
+  const lastShift=e.shifts[e.shifts.length-1];
+  return lastShift && !lastShift.end ? e : null;
+}
+function getTodayNetMins(name){
+  // Summiert alle abgeschlossenen Schichten des Tages + laufende Schicht
+  const e=getTodayEntry(name);
+  if(!e) return 0;
+  let total=0;
+  const now=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  e.shifts.forEach(s=>{
+    const endTime=s.end||now;
+    const [sh,sm]=s.start.split(':').map(Number);
+    const [eh,em]=endTime.split(':').map(Number);
+    const raw=Math.max(0,(eh*60+em)-(sh*60+sm));
+    total+=Math.max(0,raw-(s.pause||0));
+  });
+  return total;
 }
 
 function doKommen(){
   const name=getMA(); if(!name) return;
   const today=new Date().toISOString().split('T')[0];
   const now=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
-  // Remove any existing incomplete entry for today
-  entries=entries.filter(e=>!(e.name===name && e.date===today));
-  const entry={id:Date.now(),name,date:today,type:'work',start:now,end:null,pause:null,net:null,note:''};
-  entries.unshift(entry);
-  save(); sendToSheet(entry);
+
+  // Bestehenden Tageseintrag suchen
+  let existing=entries.find(e=>e.name===name && e.date===today && e.type==='work');
+
+  if(existing){
+    // Prüfe ob letzte Schicht noch offen
+    const last=existing.shifts[existing.shifts.length-1];
+    if(last && !last.end){showToast('⚠️ Bitte zuerst ausstemp­eln');return}
+    // Max 3 Schichten
+    if(existing.shifts.length>=3){showToast('⚠️ Maximale Anzahl Schichten (3) erreicht');return}
+    // Neue Schicht hinzufügen
+    existing.shifts.push({start:now,end:null,pause:null,net:null});
+    save(); sendToSheet(existing);
+    showToast('🟢 Schicht '+(existing.shifts.length)+' gestartet – '+now);
+  } else {
+    // Neuer Tageseintrag mit erster Schicht
+    const entry={
+      id:Date.now(),name,date:today,type:'work',
+      shifts:[{start:now,end:null,pause:null,net:null}],
+      note:''
+    };
+    entries.unshift(entry);
+    save(); sendToSheet(entry);
+    showToast('🟢 Kommen gestempelt – '+now);
+  }
   setTimeout(()=>refreshStempelUI(), 100);
-  showToast('🟢 Kommen gestempelt – '+now);
 }
-let gehenIdx = null, gehenEnd = null;
+let gehenIdx = null, gehenShiftIdx = null, gehenEnd = null;
 
 function doGehen(){
   const name=getMA(); if(!name) return;
@@ -457,13 +498,19 @@ function doGehen(){
   const idx=entries.findIndex(e=>e.name===name && e.date===today && e.type==='work');
   if(idx<0){showToast('⚠️ Kein Kommen-Eintrag heute');return}
 
-  // Berechne Roharbeitszeit um gesetzliche Pause zu ermitteln
-  const [sh,sm]=entries[idx].start.split(':').map(Number);
+  // Letzte offene Schicht finden
+  const shifts=entries[idx].shifts;
+  const shiftIdx=shifts.findIndex(s=>!s.end);
+  if(shiftIdx<0){showToast('⚠️ Keine offene Schicht heute');return}
+
+  // Berechne Roharbeitszeit der aktuellen Schicht
+  const [sh,sm]=shifts[shiftIdx].start.split(':').map(Number);
   const [eh,em]=now.split(':').map(Number);
   const rawMins=(eh*60+em)-(sh*60+sm);
   const legalMins=legalPause(rawMins);
 
   gehenIdx=idx;
+  gehenShiftIdx=shiftIdx;
   gehenEnd=now;
 
   // Fülle Pause-Modal
@@ -502,7 +549,8 @@ function highlightQuick(btn){
 function confirmPause(useLegal){
   if(gehenIdx===null) return;
   const rawMins=(()=>{
-    const [sh,sm]=entries[gehenIdx].start.split(':').map(Number);
+    const shift=entries[gehenIdx].shifts[gehenShiftIdx];
+    const [sh,sm]=shift.start.split(':').map(Number);
     const [eh,em]=gehenEnd.split(':').map(Number);
     return (eh*60+em)-(sh*60+sm);
   })();
@@ -520,15 +568,18 @@ function confirmPause(useLegal){
   const netMins=Math.max(0,rawMins-pauseMins);
   // Notiz aus dem Feld auslesen
   const notiz=document.getElementById('pauseNote').value.trim();
-  entries[gehenIdx].end=gehenEnd;
-  entries[gehenIdx].pause=pauseMins;
-  entries[gehenIdx].net=netMins;
+  // Aktuelle Schicht abschließen
+  entries[gehenIdx].shifts[gehenShiftIdx].end=gehenEnd;
+  entries[gehenIdx].shifts[gehenShiftIdx].pause=pauseMins;
+  entries[gehenIdx].shifts[gehenShiftIdx].net=netMins;
   if(notiz) entries[gehenIdx].note=notiz;
+  // Gesamtarbeitszeit berechnen (alle Schichten summiert)
+  entries[gehenIdx].net=entries[gehenIdx].shifts.reduce((sum,s)=>sum+(s.net||0),0);
   save(); sendToSheet(entries[gehenIdx]);
   document.getElementById('pauseModal').classList.add('hidden');
   // Notizfeld leeren für nächstes Mal
   document.getElementById('pauseNote').value='';
-  gehenIdx=null; gehenEnd=null;
+  gehenIdx=null; gehenShiftIdx=null; gehenEnd=null;
   setTimeout(()=>refreshStempelUI(), 100);
   showToast(`🔴 Feierabend! Pause: ${pauseMins} Min · Arbeitszeit: ${fmtMins(netMins)}`);
 }
@@ -570,25 +621,46 @@ function refreshStempelUI(){
     document.getElementById('azNet').textContent='–';
     return;
   }
-  // work entry
-  document.getElementById('azStart').textContent=e.start||'--:--';
-  if(e.end){
-    badge.classList.add('out'); txt.textContent='Ausgestempelt'; stime.textContent='bis '+e.end;
-    btnK.disabled=false; btnG.disabled=true;
-    document.getElementById('azPause').textContent=(e.pause||0)+'m';
-    document.getElementById('azNet').textContent=fmtMins(e.net);
-    document.getElementById('pauseInfo').textContent='⚖️ '+pauseText(e.pause);
-  } else {
-    // live counting
-    badge.classList.add('in'); txt.textContent='Eingestempelt'; stime.textContent='seit '+e.start;
-    btnK.disabled=true; btnG.disabled=false;
-    const nowStr=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
-    const calc=calcEntry(e.start,nowStr);
-    const net=calc?calc.netMins:0;
-    const p=calc?calc.pauseMins:0;
-    document.getElementById('azPause').textContent=p+'m';
-    document.getElementById('azNet').textContent=fmtMins(net);
-    document.getElementById('pauseInfo').textContent='⚖️ '+pauseText(p);
+  // work entry — Schicht-basierte Logik
+  const shifts = e.shifts || [];
+  const lastShift = shifts[shifts.length-1];
+  const shiftNr = shifts.length;
+  const allClosed = shifts.length > 0 && shifts.every(s=>s.end);
+  const hasOpen = lastShift && !lastShift.end;
+
+  // Beginn = erste Schicht
+  document.getElementById('azStart').textContent = shifts[0]?.start || '--:--';
+
+  if(allClosed){
+    // Alle Schichten abgeschlossen
+    badge.classList.add('out');
+    txt.textContent = shiftNr > 1 ? `Ausgestempelt (${shiftNr} Schichten)` : 'Ausgestempelt';
+    stime.textContent = 'bis '+lastShift.end;
+    btnK.disabled = shiftNr >= 3; // Max 3 Schichten
+    btnG.disabled = true;
+    const totalPause = shifts.reduce((s,x)=>s+(x.pause||0),0);
+    const totalNet = shifts.reduce((s,x)=>s+(x.net||0),0);
+    document.getElementById('azPause').textContent = totalPause+'m';
+    document.getElementById('azNet').textContent = fmtMins(totalNet);
+    document.getElementById('pauseInfo').textContent = shiftNr > 1
+      ? `⚖️ ${shiftNr} Schichten · Gesamt: ${fmtMins(totalNet)}`
+      : '⚖️ '+pauseText(totalPause);
+  } else if(hasOpen){
+    // Aktuelle Schicht läuft
+    badge.classList.add('in');
+    txt.textContent = shiftNr > 1 ? `Schicht ${shiftNr} läuft` : 'Eingestempelt';
+    stime.textContent = 'seit '+lastShift.start;
+    btnK.disabled = true; btnG.disabled = false;
+    const nowStr = new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+    const calc = calcEntry(lastShift.start, nowStr);
+    const currentNet = calc ? calc.netMins : 0;
+    const currentP = calc ? calc.pauseMins : 0;
+    const prevNet = shifts.slice(0,-1).reduce((s,x)=>s+(x.net||0),0);
+    document.getElementById('azPause').textContent = currentP+'m';
+    document.getElementById('azNet').textContent = fmtMins(prevNet + currentNet);
+    document.getElementById('pauseInfo').textContent = shiftNr > 1
+      ? `⚖️ Schicht ${shiftNr} · Bisherige Schichten: ${fmtMins(prevNet)}`
+      : '⚖️ '+pauseText(currentP);
   }
 }
 
