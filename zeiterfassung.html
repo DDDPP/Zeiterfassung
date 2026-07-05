@@ -875,7 +875,16 @@ function saveEntry(){
 }
 
 // ── DELETE ────────────────────────────────────────────────────────────────────
-function deleteEntry(idx){pendingDelIdx=idx;document.getElementById('confirmModal').classList.remove('hidden')}
+function deleteEntry(idx){
+  // Zeitraum-Prüfung: nur aktueller und voriger Monat
+  const e = entries[idx];
+  if(e && !isDatumErlaubt(e.date)){
+    showToast('⚠️ Einträge älter als den vorigen Monat können nur vom Chef gelöscht werden');
+    return;
+  }
+  pendingDelIdx=idx;
+  document.getElementById('confirmModal').classList.remove('hidden');
+}
 function closeConfirm(){pendingDelIdx=null;document.getElementById('confirmModal').classList.add('hidden')}
 function confirmDelete(){
   if(pendingDelIdx===null) return;
@@ -976,7 +985,7 @@ renderEntries();
   if (params.get('ma')) {
     // Nur Löschen-Button ausblenden, Bearbeiten bleibt sichtbar
     const style = document.createElement('style');
-    style.textContent = '.ibtn-delete { display: none !important; }';
+    style.textContent = '/* delete allowed for employees */';
     document.head.appendChild(style);
   }
 })();
