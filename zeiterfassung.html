@@ -478,7 +478,8 @@ async function doKommen(){
     const entry={
       id:Date.now(),name,date:today,type:'work',
       shifts:[{start:now,end:null,pause:null,net:null,location:location||null}],
-      note:''
+      note:'',
+      taetigkeiten:''
     };
     entries.unshift(entry);
     save(); sendToSheet(entry);
