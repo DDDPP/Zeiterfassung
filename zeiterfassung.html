@@ -934,6 +934,35 @@ function showToast(msg){
 // Init
 ladeMitarbeiter();
 renderEntries();
+
+// ── SERVICE WORKER (Auto-Update) ──────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').then(reg => {
+    reg.addEventListener('updatefound', () => {
+      const newWorker = reg.installing;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+          // Neue Version verfügbar
+          const t = document.getElementById('toast');
+          t.textContent = '🔄 Update verfügbar – tippe zum Aktualisieren';
+          t.classList.add('show');
+          t.style.cursor = 'pointer';
+          t.onclick = () => {
+            newWorker.postMessage({ action: 'skipWaiting' });
+            t.classList.remove('show');
+            t.style.cursor = '';
+            t.onclick = null;
+          };
+        }
+      });
+    });
+  });
+  // Seite neu laden wenn neuer SW aktiviert wird
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
+  });
+}
+
 </script>
 </body>
 </html>
