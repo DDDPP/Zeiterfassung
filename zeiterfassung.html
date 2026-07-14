@@ -203,8 +203,12 @@
       <div class="finput" style="background:#f3f4f6;font-weight:700" id="eNetDisplay">–</div>
     </div>
     <div class="fgroup">
-      <label class="flabel">Notiz (optional)</label>
-      <input type="text" class="finput" id="eNote" placeholder="z.B. Homeoffice">
+      <label class="flabel">Projekt</label>
+      <input type="text" class="finput" id="eNote" placeholder="z.B. Kunde Müller">
+    </div>
+    <div class="fgroup">
+      <label class="flabel">Tätigkeiten</label>
+      <input type="text" class="finput" id="eTaetigkeiten" placeholder="z.B. Rasenmähen, Bepflanzung">
     </div>
     <div class="mactions">
       <button class="btn-secondary" onclick="closeModal()">Abbrechen</button>
@@ -223,7 +227,7 @@
       <div class="fgroup"><label class="flabel">Von</label><input type="date" class="finput" id="rFrom"></div>
       <div class="fgroup"><label class="flabel">Bis</label><input type="date" class="finput" id="rTo"></div>
     </div>
-    <div class="fgroup"><label class="flabel">Notiz (optional)</label><input type="text" class="finput" id="rNote" placeholder="z.B. Sommerurlaub"></div>
+
     <div style="font-size:13px;color:var(--blue);font-weight:600;min-height:20px;margin-bottom:4px" id="rangeSummary"></div>
     <div class="mactions">
       <button class="btn-secondary" onclick="closeRangeModal()">Abbrechen</button>
@@ -247,8 +251,8 @@
     </div>
     <div style="font-size:12px;color:var(--muted);margin-top:-8px;margin-bottom:14px" id="pauseLegalHint"></div>
     <div class="fgroup">
-      <label class="flabel">Was hast du heute gemacht? <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
-      <input type="text" class="finput" id="pauseNote" placeholder="z.B. Kunde Müller, Lagerhaltung, Baustelle X...">
+      <label class="flabel">Tätigkeiten</label>
+      <input type="text" class="finput" id="pauseTaetigkeiten" placeholder="z.B. Rasenmähen, Bepflanzung, Lagerhaltung">
     </div>
     <div class="mactions">
       <button class="btn-secondary" onclick="confirmPause(true)">Mindestpause</button>
@@ -553,15 +557,15 @@ function confirmPause(useLegal){
     pauseMins=Math.max(0,val);
   }
   const netMins=Math.max(0,rawMins-pauseMins);
-  const notiz=document.getElementById('pauseNote').value.trim();
+  const notiz=document.getElementById('pauseTaetigkeiten').value.trim();
   entries[gehenIdx].shifts[gehenShiftIdx].end=gehenEnd;
   entries[gehenIdx].shifts[gehenShiftIdx].pause=pauseMins;
   entries[gehenIdx].shifts[gehenShiftIdx].net=netMins;
-  if(notiz) entries[gehenIdx].note=notiz;
+  if(notiz) entries[gehenIdx].taetigkeiten=notiz;
   entries[gehenIdx].net=entries[gehenIdx].shifts.reduce((sum,s)=>sum+(s.net||0),0);
   save(); sendToSheet(entries[gehenIdx]);
   document.getElementById('pauseModal').classList.add('hidden');
-  document.getElementById('pauseNote').value='';
+  document.getElementById('pauseTaetigkeiten').value='';
   gehenIdx=null; gehenShiftIdx=null; gehenEnd=null;
   setTimeout(()=>refreshStempelUI(), 100);
   showToast(`🔴 Feierabend! Pause: ${pauseMins} Min · Arbeitszeit: ${fmtMins(netMins)}`);
@@ -718,7 +722,7 @@ function renderEntries(){
     return `<div class="entry-row">
       <div class="entry-head">
         <div class="entry-icon">${icon}</div>
-        <div class="entry-name">${e.name}${e.note?` <span style="font-weight:400;color:var(--muted);font-size:12px">· ${e.note}</span>`:''}</div>
+        <div class="entry-name">${e.name}${e.note?` <span style="font-weight:400;color:var(--muted);font-size:12px">· ${e.note}</span>`:''}${e.taetigkeiten?` <span style="font-weight:400;color:var(--muted);font-size:12px">| ${e.taetigkeiten}</span>`:''}</div>
         <div class="entry-date">${dLabel}</div>
         <span class="etag ${tagCls}">${tagTxt}</span>
         <div class="entry-actions">
@@ -751,6 +755,7 @@ function openEditModal(idx){
   document.getElementById('eStart').value=(e.shifts&&e.shifts[0])?e.shifts[0].start||'':'';
   document.getElementById('eEnd').value=(e.shifts&&e.shifts[0])?e.shifts[0].end||'':'';
   document.getElementById('eNote').value=e.note||'';
+  document.getElementById('eTaetigkeiten').value=e.taetigkeiten||'';
   updateCalcDisplay();
   document.getElementById('editModal').classList.remove('hidden');
 }
@@ -769,6 +774,7 @@ function openAddModal(){
   document.getElementById('eStart').value='';
   document.getElementById('eEnd').value='';
   document.getElementById('eNote').value='';
+  document.getElementById('eTaetigkeiten').value='';
   updateCalcDisplay();
   document.getElementById('editModal').classList.remove('hidden');
 }
@@ -825,6 +831,7 @@ function saveEntry(){
     const vermerk = `⚠️ Nachgetragen am ${new Date().toLocaleDateString('de-DE')}`;
     notiz = notiz ? `${notiz} | ${vermerk}` : vermerk;
   }
+  const taetigkeiten=document.getElementById('eTaetigkeiten').value.trim();
   const entry={
     id:editIdx!==null?entries[editIdx].id:Date.now(),
     name:document.getElementById('eName').value,
@@ -833,7 +840,8 @@ function saveEntry(){
     start:s||null, end:en||null,
     pause:calc?calc.pauseMins:null,
     net:calc?calc.netMins:null,
-    note:notiz
+    note:notiz,
+    taetigkeiten:taetigkeiten||''
   };
   if(editIdx!==null){entries[editIdx]=entry;showToast('✅ Eintrag aktualisiert')}
   else{entries.unshift(entry);showToast('✅ Eintrag hinzugefügt')}
@@ -870,7 +878,7 @@ function openRangeModal(type){
     :'Wochenenden werden automatisch übersprungen.';
   document.getElementById('rFrom').value=today;
   document.getElementById('rTo').value=today;
-  document.getElementById('rNote').value='';
+  // rNote entfernt
   document.getElementById('rangeSummary').textContent='1 Tag';
   document.getElementById('rangeModal').classList.remove('hidden');
 }
@@ -897,12 +905,12 @@ function saveRange(){
   const name=getMA(); if(!name) return;
   const from=document.getElementById('rFrom').value;
   const to=document.getElementById('rTo').value;
-  const note=document.getElementById('rNote').value;
+  const note='';
   if(!from||!to||from>to){showToast('⚠️ Bitte gültigen Zeitraum wählen');return}
   let days=dateRange(from,to);
   if(rangeType==='Krank') days=days.filter(d=>{const wd=new Date(d+'T12:00:00').getDay();return wd!==0&&wd!==6});
   if(!days.length){showToast('⚠️ Keine Werktage im Zeitraum');return}
-  const newEntries=days.map(date=>({id:Date.now()+Math.random(),name,date,type:rangeType,start:null,end:null,pause:null,net:null,note}));
+  const newEntries=days.map(date=>({id:Date.now()+Math.random(),name,date,type:rangeType,start:null,end:null,pause:null,net:null,note,taetigkeiten:''}));
   entries.unshift(...newEntries);
   save(); newEntries.forEach(sendToSheet); closeRangeModal();
   refreshStempelUI();
