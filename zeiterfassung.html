@@ -735,7 +735,7 @@ function renderEntries(){
         <span class="etag ${tagCls}">${tagTxt}</span>
         <div class="entry-actions">
           <button class="ibtn" onclick="openEditModal(${i})">✏️</button>
-          <button class="ibtn ibtn-delete" onclick="deleteEntry(${i})">🗑</button>
+          ${maParam ? '' : `<button class="ibtn ibtn-delete" onclick="deleteEntry(${i})">🗑</button>`}
         </div>
       </div>
       ${timesHTML}
