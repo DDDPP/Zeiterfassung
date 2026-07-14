@@ -695,7 +695,7 @@ function renderEntries(){
     const isWork=e.type==='work';
     const icon=e.type==='Urlaub'?'🏖️':e.type==='Krank'?'🤒':e.end?'🟢':'⏳';
     const tagCls=isWork?'tag-work':e.type==='Urlaub'?'tag-urlaub':'tag-krank';
-    const tagTxt=isWork?(e.end?'Arbeitstag':'Läuft...'):e.type;
+    const allDone=e.shifts&&e.shifts.length>0&&e.shifts.every(s=>s.end);const tagTxt=isWork?(allDone?'Arbeitstag':'Läuft...'):e.type;
     const dLabel=formatDate(e.date);
     let timesHTML='';
     if(isWork && e.start){
@@ -739,8 +739,8 @@ function openEditModal(idx){
     document.getElementById('eName').disabled = false;
   }
   document.getElementById('eDate').value=e.date;
-  document.getElementById('eStart').value=e.start||'';
-  document.getElementById('eEnd').value=e.end||'';
+  document.getElementById('eStart').value=(e.shifts&&e.shifts[0])?e.shifts[0].start||'':'';
+  document.getElementById('eEnd').value=(e.shifts&&e.shifts[0])?e.shifts[0].end||'':'';
   document.getElementById('eNote').value=e.note||'';
   updateCalcDisplay();
   document.getElementById('editModal').classList.remove('hidden');
