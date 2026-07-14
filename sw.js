@@ -1,6 +1,6 @@
 // ── GARTEN HOCH 3 – Service Worker ────────────────────────────────────────────
 // Version hier hochzählen bei jedem Update → löst automatisches Update aus
-const CACHE_VERSION = 'gh3-v5';
+const CACHE_VERSION = 'gh3-v6';
 const CACHE_FILES = [
   './zeiterfassung.html',
   './apple-touch-icon.png',
