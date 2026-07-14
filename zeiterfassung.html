@@ -251,6 +251,10 @@
     </div>
     <div style="font-size:12px;color:var(--muted);margin-top:-8px;margin-bottom:14px" id="pauseLegalHint"></div>
     <div class="fgroup">
+      <label class="flabel">Projekt</label>
+      <input type="text" class="finput" id="pauseProjekt" placeholder="z.B. Kunde Müller">
+    </div>
+    <div class="fgroup">
       <label class="flabel">Tätigkeiten</label>
       <input type="text" class="finput" id="pauseTaetigkeiten" placeholder="z.B. Rasenmähen, Bepflanzung, Lagerhaltung">
     </div>
@@ -557,14 +561,17 @@ function confirmPause(useLegal){
     pauseMins=Math.max(0,val);
   }
   const netMins=Math.max(0,rawMins-pauseMins);
+  const projekt=document.getElementById('pauseProjekt').value.trim();
   const notiz=document.getElementById('pauseTaetigkeiten').value.trim();
   entries[gehenIdx].shifts[gehenShiftIdx].end=gehenEnd;
   entries[gehenIdx].shifts[gehenShiftIdx].pause=pauseMins;
   entries[gehenIdx].shifts[gehenShiftIdx].net=netMins;
+  if(projekt) entries[gehenIdx].note=projekt;
   if(notiz) entries[gehenIdx].taetigkeiten=notiz;
   entries[gehenIdx].net=entries[gehenIdx].shifts.reduce((sum,s)=>sum+(s.net||0),0);
   save(); sendToSheet(entries[gehenIdx]);
   document.getElementById('pauseModal').classList.add('hidden');
+  document.getElementById('pauseProjekt').value='';
   document.getElementById('pauseTaetigkeiten').value='';
   gehenIdx=null; gehenShiftIdx=null; gehenEnd=null;
   setTimeout(()=>refreshStempelUI(), 100);
