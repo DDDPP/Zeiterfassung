@@ -698,13 +698,22 @@ function renderEntries(){
     const allDone=e.shifts&&e.shifts.length>0&&e.shifts.every(s=>s.end);const tagTxt=isWork?(allDone?'Arbeitstag':'Läuft...'):e.type;
     const dLabel=formatDate(e.date);
     let timesHTML='';
-    if(isWork && e.start){
-      timesHTML=`<div class="entry-times">
-        <span><div class="az-lbl">Beginn</div><strong>${e.start}</strong></span>
-        ${e.end?`<span><div class="az-lbl">Ende</div><strong>${e.end}</strong></span>`:''}
-        ${e.pause!=null?`<span><div class="az-lbl">Pause</div><strong>${e.pause}m</strong></span>`:''}
-        ${e.net!=null?`<span><div class="az-lbl">Arbeitszeit</div><strong>${fmtMins(e.net)}</strong></span>`:''}
-      </div>`;
+    if(isWork && e.shifts && e.shifts.length>0){
+      const shiftsHTML = e.shifts.map((s,si)=>{
+        const label = e.shifts.length>1 ? `Schicht ${si+1}` : '';
+        return `<div class="entry-times" style="${si>0?'margin-top:6px;border-top:1px solid var(--border);padding-top:6px':''}">
+          ${label?`<span style="width:100%"><div class="az-lbl">${label}</div></span>`:''}
+          <span><div class="az-lbl">Beginn</div><strong>${s.start||'–'}</strong></span>
+          ${s.end?`<span><div class="az-lbl">Ende</div><strong>${s.end}</strong></span>`:'<span><div class="az-lbl">Ende</div><strong style="color:var(--green)">läuft…</strong></span>'}
+          ${s.pause!=null?`<span><div class="az-lbl">Pause</div><strong>${s.pause}m</strong></span>`:''}
+          ${s.net!=null?`<span><div class="az-lbl">Netto</div><strong>${fmtMins(s.net)}</strong></span>`:''}
+        </div>`;
+      }).join('');
+      const totalNet = e.shifts.reduce((sum,s)=>sum+(s.net||0),0);
+      const gesamtHTML = e.shifts.length>1 && totalNet>0
+        ? `<div style="margin-left:35px;margin-top:6px;font-size:12px;font-weight:700;color:var(--text)">Gesamt: ${fmtMins(totalNet)}</div>`
+        : '';
+      timesHTML = shiftsHTML + gesamtHTML;
     }
     return `<div class="entry-row">
       <div class="entry-head">
