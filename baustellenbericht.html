@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Baustellenbericht – Garten Hoch 3</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Baustellenbericht">
+<meta name="theme-color" content="#2D6A2D">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="180x180" href="apple-touch-icon.png">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  :root {
+    --bg:#F7F8FA; --surface:#fff; --border:#E4E7EC; --text:#111827; --muted:#6B7280;
+    --green:#16A34A; --green-light:#DCFCE7; --red:#DC2626; --red-light:#FEE2E2;
+    --blue:#2563EB; --blue-light:#DBEAFE; --orange:#EA580C; --orange-light:#FEF0E7;
+    --purple:#7C3AED; --purple-light:#EDE9FE; --radius:14px;
+    --shadow:0 1px 4px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.06);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:0 0 48px}
+  .header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 20px 14px;position:sticky;top:0;z-index:10}
+  .header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .logo img{height:34px;width:auto;display:block}
+  .header-title{font-size:15px;font-weight:700}
+  .main{padding:16px 16px 0;max-width:480px;margin:0 auto}
+  .form-card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);border:1.5px solid var(--border);padding:18px;margin-bottom:14px}
+  .card-title{font-size:14px;font-weight:700;margin-bottom:3px;display:flex;align-items:center;gap:6px}
+  .card-sub{font-size:12px;color:var(--muted);margin-bottom:14px}
+  .fgroup{margin-bottom:13px}
+  .fgroup:last-child{margin-bottom:0}
+  .flabel{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:.05em}
+  .finput{width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--text)}
+  .finput:focus{outline:none;border-color:var(--blue)}
+  textarea.finput{resize:vertical;min-height:70px;font-family:inherit}
+  select.finput{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;cursor:pointer}
+  .machine-row{margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+  .machine-row:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none}
+  .machine-title{font-size:13px;font-weight:700;margin-bottom:1px}
+  .machine-desc{font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.4}
+  .machine-inputs{display:grid;grid-template-columns:88px 1fr;gap:8px}
+  .fahrt-row{border:1.5px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px}
+  .fahrt-row-top{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+  .fahrt-row-bottom{display:flex;gap:8px;align-items:center}
+  .fahrt-row-bottom input{flex:1}
+  .empty-hint{font-size:12px;color:var(--muted);padding:6px 0 10px}
+  .add-btn{font-size:12px;font-weight:600;color:var(--blue);background:none;border:none;cursor:pointer;padding:2px 0}
+  .ibtn{width:32px;height:32px;flex-shrink:0;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
+  .btn-primary{width:100%;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:11px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer}
+  .btn-primary:disabled{opacity:.5;cursor:not-allowed}
+  .btn-secondary{padding:10px 16px;background:var(--bg);color:var(--text);border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer}
+  .photo-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .photo-thumb{position:relative;width:64px;height:64px;border-radius:8px;overflow:hidden;border:1.5px solid var(--border)}
+  .photo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .photo-remove{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;border:none;background:rgba(0,0,0,.65);color:#fff;font-size:11px;line-height:18px;cursor:pointer;padding:0}
+  .submit-wrap{padding:4px 0 8px}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#111;color:#fff;padding:11px 18px;border-radius:999px;font-size:13px;font-weight:500;z-index:200;transition:transform .3s ease;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}
+  .toast.show{transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div class="logo"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAATUAAABQCAYAAAB4UeJZAABO7UlEQVR42u19d3hd1ZX22ufce19XtVzoPYkNBLBwt5FIIIFAhklGCpkwZEhmTBIg4Aqk8PRS6aaEOplk0n4zkdImBYKBSOAq+cmU2CaYQIyNcZGs9uot5+zfH/ddWzYusjEQmLe/z5/5hPzKueesvffaa+8DlK1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyvYWmVFehrKVrWzvFRPRaLSu9N9UXo6yla1s73pQY2ZRXoayla1s7xlQKy9B2cpWtveSHTKflkwmRUvLBOroWEsA0NAATZTS5SUtW9nK9o5aJBI5svSfI+bUmJN7jfBaW5tkeUXLVrayvZNGkUjkyEKhsLkEanyg3w9+Z+nS+ScalvlR05LjPWX39PcU/uejH/3eX5hbJbCWy1Fb2cpWtr9rUGMGEYGZk2J5Z+aLhmHMsyzj+GjMBAgoFlwUcs6cKZNuvyuI5srAVraylW1/lkwmRUODz+03NEzgXXRWShEdMMh6s6CWFI8+2mdWVhs3mpZxvZAiLATBdXUGYBOs1xuGMcY0xaMbNw/cetH5D7zAzEREXH50ZXszxpwUbW3rqLm5TZVX471hra1Nsqlp/H4zukPFD2OkH4AopZaumHNRKGItYEZICAHHsVcppZ7Xmn8+c+o9jz/99NxTakZHXzz26JpPLVkx7zIi+lVra5Msb8ayval0orTxmZOiowOisTHlHRo4+rzxoUYAZTs8kVlLSwsTkQKAR9uvPC4Rjp5HRGdBUMKUIq+UXrFpw8afEZETZIiHNVLzN0KrePTRJUbduGhHKCSnePyuhe+OhFtH0+bOsV0baajcN6bZj6x0E7rq7/vANXYU8q5XnlhfvFAkDxQl6bvP3YfYkPbNI0rdHV5L8BUQEAnkCzP7T2esPYG6Zel/btTJt0u7m4BASQmgd5QFKJlIxvIkdKkDWQTqOoujE2aYvdcAECBSQfFLFHEYFLUVgjgASXEAI1d7K7RKUQ2ASZc5oANHaJRrWjb0XtWApMAgBLJIBjFZ74FQnOGbhAl6x7EBLJmKGbQ1oOEbJzAF5cC7y0HgBMHmyKjg1PB0IkWm19ELJEHBdZE6IAFKLJgQH7Q7cggWwBAAoSaV0tLIQYiAGG3RjVhD2DsV4C1YR6+X7T02P98JTwUDNv9j6bRHCt+LR2mvKkj2sST7MJv+Vr9z7mRMTPqj71mJEFNxKEYBN9cJoMBOuFI6NjDfv3D3sOmQBXWDaT3JOPAklVUGpnJk1ib09C3VRlvPagdYC7WT3Cjnce+NM9MNAA==" alt="Garten Hoch 3"></div>
+  </div>
+  <div class="header-title">🚧 Baustellenbericht</div>
+</div>
+
+<div class="main">
+  <br>
+
+  <!-- WER, PROJEKT, DATUM -->
+  <div class="form-card">
+    <div class="fgroup">
+      <label class="flabel">Erfasst von</label>
+      <select class="finput" id="ma"><option value="">– auswählen –</option></select>
+    </div>
+    <div class="fgroup">
+      <label class="flabel">Projekt / Baustelle</label>
+      <select class="finput" id="projekt"><option value="">– auswählen –</option></select>
+      <input type="text" class="finput" id="projektNeu" placeholder="Neuen Projektnamen eintragen" style="display:none;margin-top:8px">
+    </div>
+    <div class="fgroup">
+      <label class="flabel">Datum</label>
+      <input type="date" class="finput" id="datum">
+    </div>
+  </div>
+
+  <!-- MASCHINENEINSATZ -->
+  <div class="form-card">
+    <div class="card-title">🔧 Maschineneinsatz</div>
+    <div class="card-sub">Stunden je Gruppe eintragen, die genutzt wurden</div>
+
+    <div class="machine-row">
+      <div class="machine-title">Gruppe 1</div>
+      <div class="machine-desc">Bohrmaschine / Stichsäge / Flex / Akkuschrauber / Pumpe</div>
+      <div class="machine-inputs">
+        <input type="number" class="finput" id="g1Std" min="0" step="0.25" placeholder="Std.">
+        <input type="text" class="finput" id="g1Was" placeholder="Was genau?">
+      </div>
+    </div>
+
+    <div class="machine-row">
+      <div class="machine-title">Gruppe 2</div>
+      <div class="machine-desc">Vertikutierer / Freischneider / Puster / Rüttelplatte / Stampfer</div>
+      <div class="machine-inputs">
+        <input type="number" class="finput" id="g2Std" min="0" step="0.25" placeholder="Std.">
+        <input type="text" class="finput" id="g2Was" placeholder="Was genau?">
+      </div>
+    </div>
+
+    <div class="machine-row">
+      <div class="machine-title">Gruppe 3</div>
+      <div class="machine-desc">Rasenmäher / Heckenschere / Motorsäge / Schneidetisch / Kappsäge Fräse / Handkreissäge</div>
+      <div class="machine-inputs">
+        <input type="number" class="finput" id="g3Std" min="0" step="0.25" placeholder="Std.">
+        <input type="text" class="finput" id="g3Was" placeholder="Was genau?">
+      </div>
+    </div>
+
+    <div class="machine-row">
+      <div class="machine-title">Gruppe 4</div>
+      <div class="machine-desc">Bagger</div>
+      <div class="machine-inputs">
+        <input type="number" class="finput" id="g4Std" min="0" step="0.25" placeholder="Std.">
+        <input type="text" class="finput" id="g4Was" placeholder="z.B. Gelb Klaas">
+      </div>
+    </div>
+
+    <div class="machine-row">
+      <div class="machine-title">Gruppe 5</div>
+      <div class="machine-desc">Weitere</div>
+      <div class="machine-inputs">
+        <input type="number" class="finput" id="g5Std" min="0" step="0.25" placeholder="Std.">
+        <input type="text" class="finput" id="g5Was" placeholder="z.B. Häcksler">
+      </div>
+    </div>
+  </div>
+
+  <!-- FAHRTEN -->
+  <div class="form-card">
+    <div class="card-title">🚐 Besorgungs-/Entsorgungsfahrten</div>
+    <div class="card-sub">Bus (B) / Sprinter (S) / Fuso (F) / Anhänger (A)</div>
+    <div id="fahrtenList"></div>
+    <button type="button" class="add-btn" onclick="addFahrt()">+ Fahrt hinzufügen</button>
+  </div>
+
+  <!-- BELEGE -->
+  <div class="form-card">
+    <div class="card-title">🧾 Quittungen, Lieferscheine, Rechnungen</div>
+    <div class="fgroup">
+      <label class="flabel">Anzahl / Was</label>
+      <input type="text" class="finput" id="belege" placeholder="z.B. 2x Lieferschein GESA">
+    </div>
+    <input type="file" accept="image/*" capture="environment" multiple id="fotoInput" style="display:none" onchange="handleFotos(event)">
+    <button type="button" class="btn-secondary" onclick="document.getElementById('fotoInput').click()">📷 Foto hinzufügen</button>
+    <div class="photo-grid" id="fotoGrid"></div>
+  </div>
+
+  <!-- NOTIZEN -->
+  <div class="form-card">
+    <div class="card-title">📝 Bemerkungen &amp; Notizen</div>
+    <textarea class="finput" id="notizen" placeholder="Sonstige Bemerkungen..."></textarea>
+  </div>
+
+  <div class="submit-wrap">
+    <button class="btn-primary" id="submitBtn" onclick="submitBericht()">✅ Bericht senden</button>
+  </div>
+
+</div><!-- /main -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+const WEBHOOK_BASE = 'https://script.google.com/macros/s/AKfycbw1AOqcgtunqJpDKU59VTJkn5TWr1xMip90EA5iOYf-FdcOASCcocZRMqO4IRPicCZf/exec';
+
+// ── TOAST ──────────────────────────────────────────────────────────────────────
+let toastT;
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+// ── MITARBEITER LADEN ──────────────────────────────────────────────────────────
+async function ladeMitarbeiter(){
+  try{
+    const res = await fetch(WEBHOOK_BASE + '?action=mitarbeiter');
+    const data = await res.json();
+    const sel = document.getElementById('ma');
+    sel.innerHTML = '<option value="">– auswählen –</option>';
+    (data.mitarbeiter || []).forEach(name => { sel.innerHTML += `<option>${name}</option>`; });
+    let last; try{ last = localStorage.getItem('gh3_bb_lastMA'); }catch(e){}
+    if(last){ sel.value = last; }
+  }catch(e){ console.warn('Mitarbeiterliste konnte nicht geladen werden:', e); }
+}
+
+// ── PROJEKTE LADEN ─────────────────────────────────────────────────────────────
+async function ladeProjekte(){
+  try{
+    const res = await fetch(WEBHOOK_BASE + '?action=projekte');
+    const data = await res.json();
+    const sel = document.getElementById('projekt');
+    sel.innerHTML = '<option value="">– auswählen –</option>';
+    (data.projekte || []).forEach(name => { sel.innerHTML += `<option>${name}</option>`; });
+    sel.innerHTML += '<option value="__new__">+ Neues Projekt…</option>';
+    let last; try{ last = localStorage.getItem('gh3_bb_lastProjekt'); }catch(e){}
+    if(last && [...sel.options].some(o => o.value === last)){ sel.value = last; }
+  }catch(e){ console.warn('Projektliste konnte nicht geladen werden:', e); }
+}
+
+document.getElementById('projekt').addEventListener('change', function(){
+  document.getElementById('projektNeu').style.display = this.value === '__new__' ? '' : 'none';
+});
+
+// ── FAHRTEN ────────────────────────────────────────────────────────────────────
+let fahrten = [];
+const FAHRZEUGE = ['Sprinter','Bus','Fuso','Anhänger'];
+
+function addFahrt(){
+  fahrten.push({ datum: new Date().toISOString().split('T')[0], fahrzeug: 'Sprinter', ziel: '' });
+  renderFahrten();
+}
+function removeFahrt(i){ fahrten.splice(i,1); renderFahrten(); }
+function updateFahrt(i, field, value){ fahrten[i][field] = value; }
+
+function renderFahrten(){
+  const c = document.getElementById('fahrtenList');
+  if(!fahrten.length){ c.innerHTML = '<div class="empty-hint">Keine Fahrten erfasst</div>'; return; }
+  c.innerHTML = fahrten.map((f,i) => `
+    <div class="fahrt-row">
+      <div class="fahrt-row-top">
+        <input type="date" class="finput" value="${f.datum}" onchange="updateFahrt(${i},'datum',this.value)">
+        <select class="finput" onchange="updateFahrt(${i},'fahrzeug',this.value)">
+          ${FAHRZEUGE.map(v => `<option ${f.fahrzeug===v?'selected':''}>${v}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fahrt-row-bottom">
+        <input type="text" class="finput" placeholder="Anlass/Ziel" value="${f.ziel}" oninput="updateFahrt(${i},'ziel',this.value)">
+        <button type="button" class="ibtn" onclick="removeFahrt(${i})">🗑</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── FOTOS ──────────────────────────────────────────────────────────────────────
+let fotos = [];
+
+function compressImage(file){
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 1280;
+        let { width, height } = img;
+        if(width > height && width > maxDim){ height = Math.round(height*maxDim/width); width = maxDim; }
+        else if(height > maxDim){ width = Math.round(width*maxDim/height); height = maxDim; }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleFotos(e){
+  const files = Array.from(e.target.files);
+  showToast('📷 Foto wird verarbeitet...');
+  for(const file of files){
+    try{ fotos.push(await compressImage(file)); } catch(err){ console.warn(err); }
+  }
+  renderFotos();
+  e.target.value = '';
+}
+function removeFoto(i){ fotos.splice(i,1); renderFotos(); }
+function renderFotos(){
+  const grid = document.getElementById('fotoGrid');
+  grid.innerHTML = fotos.map((f,i) => `
+    <div class="photo-thumb">
+      <img src="${f}">
+      <button type="button" class="photo-remove" onclick="removeFoto(${i})">×</button>
+    </div>
+  `).join('');
+}
+
+// ── SENDEN ─────────────────────────────────────────────────────────────────────
+async function sendToSheet(payload){
+  try{
+    await fetch(WEBHOOK_BASE, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+  }catch(e){ console.warn('Fehler beim Senden:', e); }
+}
+
+async function submitBericht(){
+  const ma = document.getElementById('ma').value;
+  if(!ma){ showToast('⚠️ Bitte auswählen, wer den Bericht erfasst'); return; }
+
+  let projekt = document.getElementById('projekt').value;
+  if(projekt === '__new__'){ projekt = document.getElementById('projektNeu').value.trim(); }
+  if(!projekt){ showToast('⚠️ Bitte Projekt auswählen oder eintragen'); return; }
+
+  const datum = document.getElementById('datum').value;
+  if(!datum){ showToast('⚠️ Bitte Datum wählen'); return; }
+
+  const gruppen = {};
+  ['g1','g2','g3','g4','g5'].forEach(k => {
+    const std = parseFloat(document.getElementById(k+'Std').value) || 0;
+    const was = document.getElementById(k+'Was').value.trim();
+    if(std || was) gruppen[k] = { stunden: std, was };
+  });
+
+  const payload = {
+    type: 'baustellenbericht',
+    date: datum,
+    projekt,
+    erfasstVon: ma,
+    gruppen,
+    fahrten,
+    belege: document.getElementById('belege').value.trim(),
+    fotos,
+    notizen: document.getElementById('notizen').value.trim()
+  };
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  showToast('⏳ Bericht wird gesendet...');
+  await sendToSheet(payload);
+
+  try{
+    localStorage.setItem('gh3_bb_lastMA', ma);
+    localStorage.setItem('gh3_bb_lastProjekt', projekt);
+  }catch(e){}
+
+  showToast('✅ Baustellenbericht gespeichert');
+  resetForm();
+  btn.disabled = false;
+}
+
+function resetForm(){
+  ['g1','g2','g3','g4','g5'].forEach(k => {
+    document.getElementById(k+'Std').value = '';
+    document.getElementById(k+'Was').value = '';
+  });
+  document.getElementById('belege').value = '';
+  document.getElementById('notizen').value = '';
+  fahrten = []; renderFahrten();
+  fotos = []; renderFotos();
+  document.getElementById('projektNeu').value = '';
+  document.getElementById('projektNeu').style.display = 'none';
+  document.getElementById('projekt').value = '';
+  document.getElementById('datum').value = new Date().toISOString().split('T')[0];
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────────────
+document.getElementById('datum').value = new Date().toISOString().split('T')[0];
+renderFahrten();
+ladeMitarbeiter();
+ladeProjekte();
+</script>
+</body>
+</html>
