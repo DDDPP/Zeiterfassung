@@ -314,7 +314,7 @@ async function ladeMitarbeiter() {
         const resT = await fetch(WEBHOOK_BASE + "?action=resolve&token=" + encodeURIComponent(token));
         const dataT = await resT.json();
         if (dataT.name) RESOLVED_MA = dataT.name;
-      } catch(e) { console.warn("Token konnte nicht aufgelöst werden:", e); }
+      } catch(e) { console.warn("Token konnte nicht aufgelöst werden:", e); alert("TOKEN-FEHLER: " + e.message); }
     }
     const url = WEBHOOK_BASE + "?action=mitarbeiter";
     const res = await fetch(url);
@@ -341,6 +341,7 @@ async function ladeMitarbeiter() {
     }
   } catch(e) {
     console.warn("Mitarbeiterliste konnte nicht geladen werden:", e);
+    alert("MITARBEITER-FEHLER: " + e.message);
   }
 }
 
