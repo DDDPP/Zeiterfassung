@@ -302,17 +302,27 @@ function safeSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 const WEBHOOK_BASE = 'https://script.google.com/macros/s/AKfycbw1AOqcgtunqJpDKU59VTJkn5TWr1xMip90EA5iOYf-FdcOASCcocZRMqO4IRPicCZf/exec';
 
 let MITARBEITER = [];
+let RESOLVED_MA = null; // per Token vom Server aufgelöster Mitarbeitername (ersetzt ?ma=Name)
+function getMaParam(){ return RESOLVED_MA; }
 
 async function ladeMitarbeiter() {
   try {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    if (token) {
+      try {
+        const resT = await fetch(WEBHOOK_BASE + "?action=resolve&token=" + encodeURIComponent(token));
+        const dataT = await resT.json();
+        if (dataT.name) RESOLVED_MA = dataT.name;
+      } catch(e) { console.warn("Token konnte nicht aufgelöst werden:", e); }
+    }
     const url = WEBHOOK_BASE + "?action=mitarbeiter";
     const res = await fetch(url);
     const data = await res.json();
     if (data.mitarbeiter && data.mitarbeiter.length > 0) {
       MITARBEITER = data.mitarbeiter;
       befuelleDropdowns();
-      const params = new URLSearchParams(window.location.search);
-      const maParam = params.get('ma');
+      const maParam = getMaParam();
       if (maParam) {
         const sel = document.getElementById('ma');
         for (let i = 0; i < sel.options.length; i++) {
@@ -395,8 +405,7 @@ function showTab(n){
 
 // ── GET MA ─────────────────────────────────────────────────────────────────────
 function getMA(){
-  const params = new URLSearchParams(window.location.search);
-  const maParam = params.get('ma');
+  const maParam = getMaParam();
   if(maParam) return maParam;
   const v=document.getElementById('ma').value;
   if(!v){showToast('⚠️ Bitte zuerst Mitarbeiter auswählen');return null}
@@ -696,8 +705,7 @@ function renderWeek(){
 // ── EINTRAEGE RENDER ──────────────────────────────────────────────────────────
 function renderEntries(){
   const list=document.getElementById('entriesList');
-  const params = new URLSearchParams(window.location.search);
-  const maParam = params.get('ma');
+  const maParam = getMaParam();
   const gefilterteEntries = maParam
     ? entries.filter(e => e.name === maParam)
     : entries;
@@ -753,8 +761,7 @@ function openEditModal(idx){
   const e=entries[idx];
   document.getElementById('modalTitle').textContent='Eintrag bearbeiten';
   document.getElementById('eName').value=e.name;
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('ma')) {
+  if (getMaParam()) {
     document.getElementById('eName').disabled = true;
   } else {
     document.getElementById('eName').disabled = false;
@@ -772,8 +779,7 @@ function openAddModal(){
   const name=getMA();
   document.getElementById('modalTitle').textContent='Arbeitstag hinzufügen';
   document.getElementById('eName').value=name||MITARBEITER[0];
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('ma')) {
+  if (getMaParam()) {
     document.getElementById('eName').disabled = true;
   } else {
     document.getElementById('eName').disabled = false;
@@ -810,8 +816,7 @@ document.getElementById('eDate').addEventListener('change',function(){
 });
 
 function isDatumErlaubt(dateStr) {
-  const params = new URLSearchParams(window.location.search);
-  if (!params.get('ma')) return true;
+  if (!getMaParam()) return true;
   const datum = new Date(dateStr + 'T12:00:00');
   const heute = new Date();
   const aktMonat = heute.getMonth();
@@ -938,6 +943,8 @@ function saveWebhook(){
 }
 async function sendToSheet(entry){
   if(!webhookUrl) return;
+  const token = new URLSearchParams(window.location.search).get('token');
+  if(token) entry.token = token;
   try{await fetch(webhookUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(entry)})}catch(e){}
 }
 
