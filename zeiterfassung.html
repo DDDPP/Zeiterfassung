@@ -951,7 +951,7 @@ async function sendToSheet(entry){
 
 // ── UTILS ──────────────────────────────────────────────────────────────────────
 function save(){safeSet('gh3_entries',entries)}
-let toastT;
+var toastT;
 function showToast(msg){
   const t=document.getElementById('toast');
   t.textContent=msg; t.classList.add('show');
