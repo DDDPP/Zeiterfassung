@@ -851,9 +851,7 @@ function saveEntry(){
     name:document.getElementById('eName').value,
     date:dateVal,
     type:'work',
-    start:s||null, end:en||null,
-    pause:calc?calc.pauseMins:null,
-    net:calc?calc.netMins:null,
+    shifts:[{start:s||null, end:en||null, pause:calc?calc.pauseMins:null, net:calc?calc.netMins:null, location:null}],
     note:notiz,
     taetigkeiten:taetigkeiten||''
   };
