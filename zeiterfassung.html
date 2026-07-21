@@ -857,7 +857,7 @@ function saveEntry(){
   };
   if(editIdx!==null){entries[editIdx]=entry;showToast('✅ Eintrag aktualisiert')}
   else{entries.unshift(entry);showToast('✅ Eintrag hinzugefügt')}
-  save(); closeModal(); renderEntries();
+  save(); sendToSheet(entry); closeModal(); renderEntries();
   refreshStempelUI();
 }
 
