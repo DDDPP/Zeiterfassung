@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Leistungserfassung – Garten Hoch 3</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Leistung">
+<meta name="theme-color" content="#2D6A2D">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="180x180" href="apple-touch-icon.png">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  :root {
+    --bg:#F7F8FA; --surface:#fff; --border:#E4E7EC; --text:#111827; --muted:#6B7280;
+    --green:#16A34A; --green-light:#DCFCE7; --red:#DC2626; --red-light:#FEE2E2;
+    --blue:#2563EB; --blue-light:#DBEAFE; --orange:#EA580C; --orange-light:#FEF0E7;
+    --purple:#7C3AED; --purple-light:#EDE9FE; --radius:14px;
+    --shadow:0 1px 4px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.06);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:0 0 48px}
+  .header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 20px 14px;position:sticky;top:0;z-index:10}
+  .header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .logo img{height:34px;width:auto;display:block}
+  .header-title{font-size:15px;font-weight:700}
+  .main{padding:16px 16px 0;max-width:480px;margin:0 auto}
+  .form-card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);border:1.5px solid var(--border);padding:18px;margin-bottom:14px}
+  .card-title{font-size:14px;font-weight:700;margin-bottom:3px;display:flex;align-items:center;gap:6px}
+  .card-sub{font-size:12px;color:var(--muted);margin-bottom:14px}
+  .fgroup{margin-bottom:13px}
+  .fgroup:last-child{margin-bottom:0}
+  .flabel{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:.05em}
+  .finput{width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--text)}
+  .finput:focus{outline:none;border-color:var(--blue)}
+  select.finput{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;cursor:pointer}
+  .chip-group{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{padding:9px 14px;border-radius:999px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:background .1s,color .1s}
+  .chip.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .btn-primary{width:100%;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:11px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer}
+  .btn-primary:disabled{opacity:.5;cursor:not-allowed}
+  .btn-secondary{width:100%;padding:14px;background:var(--bg);color:var(--text);border:1.5px solid var(--border);border-radius:11px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer}
+  .timer-display{font-size:44px;font-weight:700;text-align:center;margin:8px 0 4px;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+  .timer-label{text-align:center;font-size:13px;color:var(--muted);margin-bottom:6px}
+  .timer-warning{font-size:12px;color:var(--red);text-align:center;margin-top:6px;display:none}
+  .timer-actions{display:flex;gap:8px;margin-top:16px}
+  .submit-wrap{padding:4px 0 8px}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#111;color:#fff;padding:11px 18px;border-radius:999px;font-size:13px;font-weight:500;z-index:200;transition:transform .3s ease;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}
+  .toast.show{transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div class="logo"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAATUAAABQCAYAAAB4UeJZAABO7UlEQVR42u19d3hd1ZX22ufce19XtVzoPYkNBLBwt5FIIIFAhklGCpkwZEhmTBIg4Aqk8PRS6aaEOplk0n4zkdImBYKBSOAq+cmU2CaYQIyNcZGs9uot5+zfH/ddWzYusjEQmLe/z5/5hPzKueesvffaa+8DlK1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZ/q5BjRlEBGZOiuWdmS8ahjHPsozjozETIKBYcFHIOXOmTLr9riCaKwNbucpWtrK9o0YRicSRhTLmZI5r7JuZ5xL5+aJhGPMsyzg+GjMBAooFF4WcM2fKpNvvCqK5MrCVrWxle6ct4vd7DQ0TmJl9v9CVqfyDwOFYFm6SdD1UPVE33qTdVU4qq9laVsZftHmWEY8yzLOD4aMwECigUXhZwzZ8qk2+8KormyvWXzeQz4/T7DMMYwsxJC3NIC3f4bAfx3AB8H8OU+VOGDe3sDrq0K7Kga5sQOgeAgOJ2GfjxRPzsjYtwF4CQiKgRs69bVwzhK6R0AZpe6uKgy8m8u+PoTfWfNqzknKlv+ZeMe0BGRQEyMcqAAAAAElFTkSuQmCC" alt="Garten Hoch 3"></div>
+  </div>
+  <div class="header-title">⏱️ Leistungserfassung</div>
+</div>
+
+<div class="main">
+  <br>
+
+  <div class="form-card" id="tokenError" style="display:none;border-color:var(--red)">
+    <div class="card-title" style="color:var(--red)">⚠️ Ungültiger Zugang</div>
+    <div class="card-sub">Bitte den vollständigen Link mit Zugangscode verwenden.</div>
+  </div>
+
+  <!-- MITARBEITER -->
+  <div class="form-card">
+    <div class="fgroup" style="margin-bottom:0">
+      <label class="flabel">Wer bist du?</label>
+      <select class="finput" id="leMa"><option value="">– auswählen –</option></select>
+    </div>
+  </div>
+
+  <!-- START-BUTTON (initialer Zustand) -->
+  <div class="submit-wrap" id="startWrap">
+    <button class="btn-primary" id="startBtn" onclick="zeigeAuswahl('start')" disabled>▶️ Runde starten</button>
+  </div>
+
+  <!-- KATEGORIE/PROJEKT-AUSWAHL -->
+  <div class="form-card" id="auswahlCard" style="display:none">
+    <div class="card-title">⏱️ Was machst du gerade?</div>
+    <div class="chip-group" id="katChips"></div>
+    <input type="text" class="finput" id="katSonstigesText" placeholder="Sonstiges: was genau?" style="display:none;margin-top:8px">
+    <div class="fgroup" style="margin-top:14px">
+      <label class="flabel">Projekt (optional)</label>
+      <select class="finput" id="leProjekt"><option value="">– kein Projekt / nicht zutreffend –</option></select>
+      <input type="text" class="finput" id="leProjektNeu" placeholder="Neuen Projektnamen eintragen" style="display:none;margin-top:8px">
+    </div>
+    <button class="btn-primary" id="bestaetigenBtn" style="margin-top:16px" onclick="bestaetigeAuswahl()">Starten</button>
+  </div>
+
+  <!-- LAUFENDER TIMER -->
+  <div class="form-card" id="timerCard" style="display:none">
+    <div class="timer-label" id="timerKategorieLabel"></div>
+    <div class="timer-display" id="timerDisplay">00:00:00</div>
+    <div class="timer-warning" id="timerWarnung">⚠️ Läuft seit über 12 Std. – vergessen zu stoppen? Bitte bei Bedarf im Sheet korrigieren.</div>
+    <div class="timer-actions">
+      <button class="btn-secondary" onclick="naechsteRunde()">🔄 Nächste Runde</button>
+      <button class="btn-primary" onclick="rundeFertig()">✅ Fertig</button>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+const WEBHOOK_BASE = 'https://script.google.com/macros/s/AKfycbw1AOqcgtunqJpDKU59VTJkn5TWr1xMip90EA5iOYf-FdcOASCcocZRMqO4IRPicCZf/exec';
+const TOKEN = new URLSearchParams(window.location.search).get('token') || '';
+
+const KATEGORIEN = [
+  'Rüstzeit','Fahrzeit','Baustellenzeit','Lagerarbeit','Kundenakquise',
+  'Besorgungsfahrt','Entsorgungsfahrt','Maschineninstandhaltung','Sonstiges'
+];
+
+let aktuellerMA = '';
+let aktuelleRunde = null;   // { id, mitarbeiter, kategorie, projekt, start (ISO-String) }
+let timerInterval = null;
+let ausgewaehlteKategorie = null;
+let auswahlModus = 'start'; // 'start' oder 'wechsel'
+
+// ── TOAST ──────────────────────────────────────────────────────────────────────
+let toastT;
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+// ── LOKALE RUNDE (Wiederherstellung bei App-Neustart) ──────────────────────────
+function ladeLokaleRunde(){
+  try{ const raw = localStorage.getItem('gh3_le_runde'); return raw ? JSON.parse(raw) : null; }
+  catch(e){ return null; }
+}
+function speichereLokaleRunde(r){
+  try{ localStorage.setItem('gh3_le_runde', JSON.stringify(r)); }catch(e){}
+}
+function loescheLokaleRunde(){
+  try{ localStorage.removeItem('gh3_le_runde'); }catch(e){}
+}
+function neueId(){
+  return (crypto.randomUUID) ? crypto.randomUUID() : ('id-' + Date.now() + '-' + Math.random().toString(16).slice(2));
+}
+
+// ── MITARBEITER LADEN ──────────────────────────────────────────────────────────
+async function ladeMitarbeiter(){
+  try{
+    const res = await fetch(WEBHOOK_BASE + '?action=leistung_mitarbeiter&token=' + encodeURIComponent(TOKEN));
+    const data = await res.json();
+    if(data.status !== 'ok'){ showToast('⚠️ Zugang ungültig – bitte Link prüfen'); return; }
+    const sel = document.getElementById('leMa');
+    sel.innerHTML = '<option value="">– auswählen –</option>';
+    (data.mitarbeiter || []).forEach(name => { sel.innerHTML += `<option>${name}</option>`; });
+    let last; try{ last = localStorage.getItem('gh3_le_lastMA'); }catch(e){}
+    if(last && [...sel.options].some(o => o.value === last)){
+      sel.value = last;
+      aktuellerMA = last;
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('startWrap').style.display = '';
+      await pruefeAktuelleRunde();
+    }
+  }catch(e){ console.warn('Mitarbeiterliste konnte nicht geladen werden:', e); showToast('⚠️ Verbindung fehlgeschlagen'); }
+}
+
+document.getElementById('leMa').addEventListener('change', async function(){
+  aktuellerMA = this.value;
+  try{ localStorage.setItem('gh3_le_lastMA', aktuellerMA); }catch(e){}
+  document.getElementById('startBtn').disabled = !aktuellerMA;
+  clearInterval(timerInterval);
+  aktuelleRunde = null;
+  document.getElementById('timerCard').style.display = 'none';
+  document.getElementById('auswahlCard').style.display = 'none';
+  document.getElementById('startWrap').style.display = aktuellerMA ? '' : 'none';
+  if(aktuellerMA) await pruefeAktuelleRunde();
+});
+
+async function pruefeAktuelleRunde(){
+  const lokal = ladeLokaleRunde();
+  if(lokal && lokal.mitarbeiter === aktuellerMA){
+    aktuelleRunde = lokal;
+    zeigeTimer();
+    return;
+  }
+  try{
+    const res = await fetch(WEBHOOK_BASE + '?action=leistung_offene_runde&mitarbeiter=' + encodeURIComponent(aktuellerMA) + '&token=' + encodeURIComponent(TOKEN));
+    const data = await res.json();
+    if(data.status === 'ok' && data.runde){
+      aktuelleRunde = { id: data.runde.id, mitarbeiter: aktuellerMA, kategorie: data.runde.kategorie, projekt: data.runde.projekt, start: data.runde.start };
+      speichereLokaleRunde(aktuelleRunde);
+      zeigeTimer();
+    }
+  }catch(e){ console.warn('Konnte offene Runde nicht prüfen:', e); }
+}
+
+// ── PROJEKTE LADEN ─────────────────────────────────────────────────────────────
+async function ladeProjekte(){
+  try{
+    const res = await fetch(WEBHOOK_BASE + '?action=projekte');
+    const data = await res.json();
+    const sel = document.getElementById('leProjekt');
+    sel.innerHTML = '<option value="">– kein Projekt / nicht zutreffend –</option>';
+    (data.projekte || []).forEach(name => { sel.innerHTML += `<option>${name}</option>`; });
+    sel.innerHTML += '<option value="__new__">+ Neues Projekt…</option>';
+  }catch(e){ console.warn('Projektliste konnte nicht geladen werden:', e); }
+}
+document.getElementById('leProjekt').addEventListener('change', function(){
+  document.getElementById('leProjektNeu').style.display = this.value === '__new__' ? '' : 'none';
+});
+
+// ── KATEGORIE-CHIPS ─────────────────────────────────────────────────────────────
+function renderKatChips(){
+  const c = document.getElementById('katChips');
+  c.innerHTML = KATEGORIEN.map(k =>
+    `<button type="button" class="chip ${k===ausgewaehlteKategorie?'active':''}" onclick="waehleKategorie('${k}')">${k}</button>`
+  ).join('');
+}
+function waehleKategorie(k){
+  ausgewaehlteKategorie = k;
+  renderKatChips();
+  document.getElementById('katSonstigesText').style.display = (k === 'Sonstiges') ? '' : 'none';
+}
+
+// ── AUSWAHL-PANEL (Start ODER Wechsel) ──────────────────────────────────────────
+function zeigeAuswahl(modus){
+  auswahlModus = modus;
+  ausgewaehlteKategorie = null;
+  document.getElementById('katSonstigesText').value = '';
+  document.getElementById('katSonstigesText').style.display = 'none';
+  renderKatChips();
+  document.getElementById('leProjekt').value = '';
+  document.getElementById('leProjektNeu').style.display = 'none';
+  document.getElementById('leProjektNeu').value = '';
+  document.getElementById('bestaetigenBtn').textContent = modus === 'start' ? 'Starten' : 'Wechseln';
+  document.getElementById('auswahlCard').style.display = '';
+  document.getElementById('startWrap').style.display = 'none';
+  document.getElementById('timerCard').style.display = 'none';
+}
+
+async function bestaetigeAuswahl(){
+  if(!ausgewaehlteKategorie){ showToast('⚠️ Bitte auswählen, was du gerade machst'); return; }
+
+  let kategorie = ausgewaehlteKategorie;
+  if(kategorie === 'Sonstiges'){
+    const text = document.getElementById('katSonstigesText').value.trim();
+    if(!text){ showToast('⚠️ Bitte kurz eintragen, was du machst'); return; }
+    kategorie = 'Sonstiges: ' + text;
+  }
+
+  let projekt = document.getElementById('leProjekt').value;
+  if(projekt === '__new__'){ projekt = document.getElementById('leProjektNeu').value.trim(); }
+
+  const jetzt = new Date().toISOString();
+  const id = neueId();
+
+  if(auswahlModus === 'start'){
+    aktuelleRunde = { id, mitarbeiter: aktuellerMA, kategorie, projekt, start: jetzt };
+    await sendToSheet({ type:'leistung_start', token: TOKEN, id, mitarbeiter: aktuellerMA, kategorie, projekt, startZeit: jetzt });
+  } else {
+    const alteId = aktuelleRunde.id;
+    await sendToSheet({ type:'leistung_wechsel', token: TOKEN, id: alteId, endZeit: jetzt, neue: { id, kategorie, projekt, startZeit: jetzt } });
+    aktuelleRunde = { id, mitarbeiter: aktuellerMA, kategorie, projekt, start: jetzt };
+  }
+
+  speichereLokaleRunde(aktuelleRunde);
+  zeigeTimer();
+}
+
+function naechsteRunde(){ zeigeAuswahl('wechsel'); }
+
+async function rundeFertig(){
+  if(!aktuelleRunde) return;
+  const jetzt = new Date().toISOString();
+  await sendToSheet({ type:'leistung_stop', token: TOKEN, id: aktuelleRunde.id, endZeit: jetzt });
+  aktuelleRunde = null;
+  loescheLokaleRunde();
+  clearInterval(timerInterval);
+  document.getElementById('timerCard').style.display = 'none';
+  document.getElementById('auswahlCard').style.display = 'none';
+  document.getElementById('startWrap').style.display = '';
+  showToast('✅ Runde gespeichert');
+}
+
+// ── TIMER-ANZEIGE ────────────────────────────────────────────────────────────
+function zeigeTimer(){
+  document.getElementById('auswahlCard').style.display = 'none';
+  document.getElementById('startWrap').style.display = 'none';
+  document.getElementById('timerCard').style.display = '';
+  document.getElementById('timerKategorieLabel').textContent =
+    aktuelleRunde.kategorie + (aktuelleRunde.projekt ? ' · ' + aktuelleRunde.projekt : '');
+  clearInterval(timerInterval);
+  updateTimerDisplay();
+  timerInterval = setInterval(updateTimerDisplay, 1000);
+}
+function updateTimerDisplay(){
+  const diffMs = Date.now() - new Date(aktuelleRunde.start).getTime();
+  const totalSec = Math.max(0, Math.floor(diffMs/1000));
+  const h = String(Math.floor(totalSec/3600)).padStart(2,'0');
+  const m = String(Math.floor((totalSec%3600)/60)).padStart(2,'0');
+  const s = String(totalSec%60).padStart(2,'0');
+  document.getElementById('timerDisplay').textContent = `${h}:${m}:${s}`;
+  document.getElementById('timerWarnung').style.display = (totalSec > 12*3600) ? '' : 'none';
+}
+
+// ── SENDEN ─────────────────────────────────────────────────────────────────────
+async function sendToSheet(payload){
+  try{
+    await fetch(WEBHOOK_BASE, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+  }catch(e){ console.warn('Fehler beim Senden:', e); }
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────────────
+if(!TOKEN){
+  document.getElementById('tokenError').style.display = '';
+} else {
+  ladeMitarbeiter();
+  ladeProjekte();
+}
+
+// ── SERVICE WORKER (Auto-Update) ──────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').then(reg => {
+    reg.addEventListener('updatefound', () => {
+      const newWorker = reg.installing;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+          const t = document.getElementById('toast');
+          t.textContent = '🔄 Update verfügbar – tippe zum Aktualisieren';
+          t.classList.add('show');
+          t.style.cursor = 'pointer';
+          t.onclick = () => {
+            newWorker.postMessage({ action: 'skipWaiting' });
+            t.classList.remove('show');
+            t.style.cursor = '';
+            t.onclick = null;
+          };
+        }
+      });
+    });
+  });
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
+  });
+}
+</script>
+</body>
+</html>
