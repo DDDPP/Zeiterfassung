@@ -62,7 +62,7 @@
 
 <div class="header">
   <div class="header-top">
-    <div class="logo"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAATUAAABQCAYAAAB4UeJZAABO7UlEQVR42u19d3hd1ZX22ufce19XtVzoPYkNBLBwt5FIIIFAhklGCpkwZEhmTBIg4Aqk8PRS6aaEOplk0n4zkdImBYKBSOAq+cmU2CaYQIyNcZGs9uot5+zfH/ddWzYusjEQmLe/z5/5hPzKueesvffaa+8DlK1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2f6uQY0ZRARmTorlnZkvGoYxz7KM46MxEyCgWHBRyDlzpky6/a4gmisDW7nKVrayvaNGEYnEkYUy5mSOa+ybmecS+fmiYRjzLMs4PhozAQKKBReFnDNnyqTb7wqiuTKwlatsZXunLeL3ew0NE5iZfb/QlanRgLBIeTfeVMHgYAAJIyMDW7nKVra3+//jY1JLzQVoAAAAAElFTkSuQmCC" alt="Garten Hoch 3"></div>
+    <div class="logo"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAATUAAABQCAYAAAB4UeJZAABO7UlEQVR42u19d3hd1ZX22ufce19XtVzoPYkNBLBwt5FIIIFAhklGCpkwZEhmTBIg4Aqk8PRS6aaEOplk0n4zkdImBYKBSOAq+cmU2CaYQIyNcZGs9uot5+zfH/ddWzYusjEQmLe/z5/5hPzKueesvffaa+8DlK1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2f6uQY0ZRARmTorlnZkvGoYxz7KM46MxEyCgWHBRyDlzpky6/a4gmisDW7nKVrayvaNGEYnEkYUy5mSOa+ybmecS+fmiYRjzLMs4PhozAQKKBReFnDNnyqTb7wqiuTKwlatsZXunLeL3ew0NE5iZfb/QlanRgLBIeTfeVMHgYAAJIyMDW7nKVra3+//jY1JLzQVoAAAAAElFTkSuQmCC" alt="Garten Hoch 3"></div>
   </div>
   <div class="header-title">⏱️ Leistungserfassung</div>
 </div>
@@ -110,3 +110,424 @@
       <button class="btn-secondary" onclick="naechsteRunde()">🔄 Nächste Runde</button>
       <button class="btn-primary" onclick="rundeFertig()">✅ Fertig</button>
     </div>
+  </div>
+
+  <!-- BISHERIGE RUNDEN HEUTE -->
+  <div class="form-card" id="heuteCard" style="display:none">
+    <div class="card-title">📋 Bisherige Runden heute</div>
+    <div class="card-sub">Zum Bearbeiten oder Löschen antippen</div>
+    <div id="heuteListe"></div>
+  </div>
+
+  <!-- RUNDE BEARBEITEN -->
+  <div class="form-card" id="bearbeitenCard" style="display:none">
+    <div class="card-title">✏️ Runde bearbeiten</div>
+    <div class="chip-group" id="editKatChips"></div>
+    <input type="text" class="finput" id="editKatSonstigesText" placeholder="Sonstiges: was genau?" style="display:none;margin-top:8px">
+    <div class="fgroup" style="margin-top:14px">
+      <label class="flabel">Projekt (optional)</label>
+      <select class="finput" id="editProjekt"><option value="">– kein Projekt / nicht zutreffend –</option></select>
+      <input type="text" class="finput" id="editProjektNeu" placeholder="Neuen Projektnamen eintragen" style="display:none;margin-top:8px">
+    </div>
+    <div class="fgroup" style="margin-top:14px;display:flex;gap:8px">
+      <div style="flex:1">
+        <label class="flabel">Start</label>
+        <input type="time" class="finput" id="editStart">
+      </div>
+      <div style="flex:1">
+        <label class="flabel">Ende</label>
+        <input type="time" class="finput" id="editEnde">
+      </div>
+    </div>
+    <div class="timer-actions">
+      <button class="btn-secondary" style="color:var(--red)" onclick="loescheAktuelleRunde()">🗑 Löschen</button>
+      <button class="btn-primary" onclick="speichereBearbeitung()">Speichern</button>
+    </div>
+    <button class="btn-secondary" style="margin-top:8px" onclick="schliesseBearbeiten()">Abbrechen</button>
+  </div>
+
+</div><!-- /main -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+const WEBHOOK_BASE = 'https://script.google.com/macros/s/AKfycbw1AOqcgtunqJpDKU59VTJkn5TWr1xMip90EA5iOYf-FdcOASCcocZRMqO4IRPicCZf/exec';
+const TOKEN = new URLSearchParams(window.location.search).get('token') || '';
+
+const KATEGORIEN = [
+  'Rüstzeit','Fahrzeit','Baustellenzeit','Lagerarbeit','Kundenakquise',
+  'Besorgungsfahrt','Entsorgungsfahrt','Maschineninstandhaltung','Sonstiges'
+];
+
+let aktuellerMA = '';
+let aktuelleRunde = null;   // { id, mitarbeiter, kategorie, projekt, start (ISO-String) }
+let timerInterval = null;
+let ausgewaehlteKategorie = null;
+let auswahlModus = 'start'; // 'start' oder 'wechsel'
+
+// ── TOAST ──────────────────────────────────────────────────────────────────────
+let toastT;
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+// ── LOKALE RUNDE (Wiederherstellung bei App-Neustart) ──────────────────────────
+function ladeLokaleRunde(){
+  try{ const raw = localStorage.getItem('gh3_le_runde'); return raw ? JSON.parse(raw) : null; }
+  catch(e){ return null; }
+}
+function speichereLokaleRunde(r){
+  try{ localStorage.setItem('gh3_le_runde', JSON.stringify(r)); }catch(e){}
+}
+function loescheLokaleRunde(){
+  try{ localStorage.removeItem('gh3_le_runde'); }catch(e){}
+}
+function neueId(){
+  return (crypto.randomUUID) ? crypto.randomUUID() : ('id-' + Date.now() + '-' + Math.random().toString(16).slice(2));
+}
+
+// ── MITARBEITER LADEN ──────────────────────────────────────────────────────────
+async function ladeMitarbeiter(){
+  try{
+    const res = await fetch(WEBHOOK_BASE + '?action=leistung_mitarbeiter&token=' + encodeURIComponent(TOKEN));
+    const data = await res.json();
+    if(data.status !== 'ok'){ showToast('⚠️ Zugang ungültig – bitte Link prüfen'); return; }
+    const sel = document.getElementById('leMa');
+    sel.innerHTML = '<option value="">– auswählen –</option>';
+    (data.mitarbeiter || []).forEach(name => { sel.innerHTML += `<option>${name}</option>`; });
+    let last; try{ last = localStorage.getItem('gh3_le_lastMA'); }catch(e){}
+    if(last && [...sel.options].some(o => o.value === last)){
+      sel.value = last;
+      aktuellerMA = last;
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('startWrap').style.display = '';
+      await pruefeAktuelleRunde();
+      await ladeRundenHeute();
+    }
+  }catch(e){ console.warn('Mitarbeiterliste konnte nicht geladen werden:', e); showToast('⚠️ Verbindung fehlgeschlagen'); }
+}
+
+document.getElementById('leMa').addEventListener('change', async function(){
+  aktuellerMA = this.value;
+  try{ localStorage.setItem('gh3_le_lastMA', aktuellerMA); }catch(e){}
+  document.getElementById('startBtn').disabled = !aktuellerMA;
+  clearInterval(timerInterval);
+  aktuelleRunde = null;
+  document.getElementById('timerCard').style.display = 'none';
+  document.getElementById('auswahlCard').style.display = 'none';
+  document.getElementById('startWrap').style.display = aktuellerMA ? '' : 'none';
+  document.getElementById('heuteCard').style.display = 'none';
+  schliesseBearbeiten();
+  if(aktuellerMA){
+    await pruefeAktuelleRunde();
+    await ladeRundenHeute();
+  }
+});
+
+async function pruefeAktuelleRunde(){
+  const lokal = ladeLokaleRunde();
+  if(lokal && lokal.mitarbeiter === aktuellerMA){
+    aktuelleRunde = lokal;
+    zeigeTimer();
+    return;
+  }
+  try{
+    const res = await fetch(WEBHOOK_BASE + '?action=leistung_offene_runde&mitarbeiter=' + encodeURIComponent(aktuellerMA) + '&token=' + encodeURIComponent(TOKEN));
+    const data = await res.json();
+    if(data.status === 'ok' && data.runde){
+      aktuelleRunde = { id: data.runde.id, mitarbeiter: aktuellerMA, kategorie: data.runde.kategorie, projekt: data.runde.projekt, start: data.runde.start };
+      speichereLokaleRunde(aktuelleRunde);
+      zeigeTimer();
+    }
+  }catch(e){ console.warn('Konnte offene Runde nicht prüfen:', e); }
+}
+
+// ── PROJEKTE LADEN ─────────────────────────────────────────────────────────────
+async function ladeProjekte(){
+  try{
+    const res = await fetch(WEBHOOK_BASE + '?action=projekte');
+    const data = await res.json();
+    const optionsHtml = '<option value="">– kein Projekt / nicht zutreffend –</option>' +
+      (data.projekte || []).map(name => `<option>${name}</option>`).join('') +
+      '<option value="__new__">+ Neues Projekt…</option>';
+    document.getElementById('leProjekt').innerHTML = optionsHtml;
+    document.getElementById('editProjekt').innerHTML = optionsHtml;
+  }catch(e){ console.warn('Projektliste konnte nicht geladen werden:', e); }
+}
+document.getElementById('leProjekt').addEventListener('change', function(){
+  document.getElementById('leProjektNeu').style.display = this.value === '__new__' ? '' : 'none';
+});
+document.getElementById('editProjekt').addEventListener('change', function(){
+  document.getElementById('editProjektNeu').style.display = this.value === '__new__' ? '' : 'none';
+});
+
+// ── BISHERIGE RUNDEN HEUTE ──────────────────────────────────────────────────────
+let letzteRundenHeute = [];
+
+async function ladeRundenHeute(){
+  if(!aktuellerMA) return;
+  try{
+    const res = await fetch(WEBHOOK_BASE + '?action=leistung_heute&mitarbeiter=' + encodeURIComponent(aktuellerMA) + '&token=' + encodeURIComponent(TOKEN));
+    const data = await res.json();
+    if(data.status === 'ok'){
+      letzteRundenHeute = data.runden || [];
+      renderRundenHeute(letzteRundenHeute);
+    }
+  }catch(e){ console.warn('Tagesübersicht konnte nicht geladen werden:', e); }
+}
+
+function formatUhrzeit(iso){
+  const d = new Date(iso);
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+
+function renderRundenHeute(runden){
+  const card = document.getElementById('heuteCard');
+  const liste = document.getElementById('heuteListe');
+  if(!runden.length){ card.style.display = 'none'; return; }
+  card.style.display = '';
+  liste.innerHTML = runden.map(r => `
+    <div class="runde-row" onclick="oeffneBearbeiten('${r.id}')">
+      <div>
+        <div class="runde-info">${r.kategorie}</div>
+        ${r.projekt ? `<div class="runde-projekt">${r.projekt}</div>` : ''}
+      </div>
+      <div>
+        <div class="runde-dauer">${r.dauerMin} Min</div>
+        <div class="runde-zeit">${formatUhrzeit(r.start)}–${formatUhrzeit(r.ende)}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── KATEGORIE-CHIPS ─────────────────────────────────────────────────────────────
+function renderKatChips(){
+  const c = document.getElementById('katChips');
+  c.innerHTML = KATEGORIEN.map(k =>
+    `<button type="button" class="chip ${k===ausgewaehlteKategorie?'active':''}" onclick="waehleKategorie('${k}')">${k}</button>`
+  ).join('');
+}
+function waehleKategorie(k){
+  ausgewaehlteKategorie = k;
+  renderKatChips();
+  document.getElementById('katSonstigesText').style.display = (k === 'Sonstiges') ? '' : 'none';
+}
+
+// ── RUNDE BEARBEITEN/LÖSCHEN ─────────────────────────────────────────────────────
+let bearbeiteteRunde = null;
+let editKategorie = null;
+
+function oeffneBearbeiten(id){
+  const runde = letzteRundenHeute.find(r => r.id === id);
+  if(!runde) return;
+  bearbeiteteRunde = runde;
+
+  if((runde.kategorie || '').startsWith('Sonstiges')){
+    editKategorie = 'Sonstiges';
+    document.getElementById('editKatSonstigesText').style.display = '';
+    document.getElementById('editKatSonstigesText').value = runde.kategorie.replace(/^Sonstiges:\s*/, '');
+  } else {
+    editKategorie = runde.kategorie;
+    document.getElementById('editKatSonstigesText').style.display = 'none';
+    document.getElementById('editKatSonstigesText').value = '';
+  }
+  renderEditKatChips();
+
+  const projektSel = document.getElementById('editProjekt');
+  projektSel.value = [...projektSel.options].some(o => o.value === runde.projekt) ? runde.projekt : '';
+  document.getElementById('editProjektNeu').style.display = 'none';
+  document.getElementById('editProjektNeu').value = '';
+
+  document.getElementById('editStart').value = formatZeitInput(runde.start);
+  document.getElementById('editEnde').value = formatZeitInput(runde.ende);
+
+  document.getElementById('bearbeitenCard').style.display = '';
+  document.getElementById('bearbeitenCard').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function formatZeitInput(iso){
+  const d = new Date(iso);
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+
+function renderEditKatChips(){
+  const c = document.getElementById('editKatChips');
+  c.innerHTML = KATEGORIEN.map(k =>
+    `<button type="button" class="chip ${k===editKategorie?'active':''}" onclick="waehleEditKategorie('${k}')">${k}</button>`
+  ).join('');
+}
+function waehleEditKategorie(k){
+  editKategorie = k;
+  renderEditKatChips();
+  document.getElementById('editKatSonstigesText').style.display = (k === 'Sonstiges') ? '' : 'none';
+}
+
+function schliesseBearbeiten(){
+  bearbeiteteRunde = null;
+  document.getElementById('bearbeitenCard').style.display = 'none';
+}
+
+async function speichereBearbeitung(){
+  if(!bearbeiteteRunde) return;
+  if(!editKategorie){ showToast('⚠️ Bitte Kategorie auswählen'); return; }
+
+  let kategorie = editKategorie;
+  if(kategorie === 'Sonstiges'){
+    const text = document.getElementById('editKatSonstigesText').value.trim();
+    if(!text){ showToast('⚠️ Bitte kurz eintragen, was gemacht wurde'); return; }
+    kategorie = 'Sonstiges: ' + text;
+  }
+
+  let projekt = document.getElementById('editProjekt').value;
+  if(projekt === '__new__'){ projekt = document.getElementById('editProjektNeu').value.trim(); }
+
+  const basisDatum = new Date(bearbeiteteRunde.start);
+  const [hS, mS] = document.getElementById('editStart').value.split(':').map(Number);
+  const [hE, mE] = document.getElementById('editEnde').value.split(':').map(Number);
+  const neuStart = new Date(basisDatum); neuStart.setHours(hS, mS, 0, 0);
+  const neuEnde = new Date(basisDatum); neuEnde.setHours(hE, mE, 0, 0);
+  if(neuEnde <= neuStart){ showToast('⚠️ Ende muss nach Start liegen'); return; }
+
+  await sendToSheet({ type:'leistung_update', token: TOKEN, id: bearbeiteteRunde.id, kategorie, projekt, startZeit: neuStart.toISOString(), endZeit: neuEnde.toISOString() });
+  schliesseBearbeiten();
+  showToast('✅ Runde aktualisiert');
+  await ladeRundenHeute();
+}
+
+async function loescheAktuelleRunde(){
+  if(!bearbeiteteRunde) return;
+  if(!confirm('Diese Runde wirklich löschen?')) return;
+  await sendToSheet({ type:'leistung_delete', token: TOKEN, id: bearbeiteteRunde.id });
+  schliesseBearbeiten();
+  showToast('🗑 Runde gelöscht');
+  await ladeRundenHeute();
+}
+
+// ── AUSWAHL-PANEL (Start ODER Wechsel) ──────────────────────────────────────────
+function zeigeAuswahl(modus){
+  auswahlModus = modus;
+  ausgewaehlteKategorie = null;
+  document.getElementById('katSonstigesText').value = '';
+  document.getElementById('katSonstigesText').style.display = 'none';
+  renderKatChips();
+  document.getElementById('leProjekt').value = '';
+  document.getElementById('leProjektNeu').style.display = 'none';
+  document.getElementById('leProjektNeu').value = '';
+  document.getElementById('bestaetigenBtn').textContent = modus === 'start' ? 'Starten' : 'Wechseln';
+  document.getElementById('auswahlCard').style.display = '';
+  document.getElementById('startWrap').style.display = 'none';
+  document.getElementById('timerCard').style.display = 'none';
+}
+
+async function bestaetigeAuswahl(){
+  if(!ausgewaehlteKategorie){ showToast('⚠️ Bitte auswählen, was du gerade machst'); return; }
+
+  let kategorie = ausgewaehlteKategorie;
+  if(kategorie === 'Sonstiges'){
+    const text = document.getElementById('katSonstigesText').value.trim();
+    if(!text){ showToast('⚠️ Bitte kurz eintragen, was du machst'); return; }
+    kategorie = 'Sonstiges: ' + text;
+  }
+
+  let projekt = document.getElementById('leProjekt').value;
+  if(projekt === '__new__'){ projekt = document.getElementById('leProjektNeu').value.trim(); }
+
+  const jetzt = new Date().toISOString();
+  const id = neueId();
+
+  if(auswahlModus === 'start'){
+    aktuelleRunde = { id, mitarbeiter: aktuellerMA, kategorie, projekt, start: jetzt };
+    await sendToSheet({ type:'leistung_start', token: TOKEN, id, mitarbeiter: aktuellerMA, kategorie, projekt, startZeit: jetzt });
+  } else {
+    const alteId = aktuelleRunde.id;
+    await sendToSheet({ type:'leistung_wechsel', token: TOKEN, id: alteId, mitarbeiter: aktuellerMA, endZeit: jetzt, neue: { id, kategorie, projekt, startZeit: jetzt } });
+    aktuelleRunde = { id, mitarbeiter: aktuellerMA, kategorie, projekt, start: jetzt };
+  }
+
+  speichereLokaleRunde(aktuelleRunde);
+  zeigeTimer();
+  await ladeRundenHeute();
+}
+
+function naechsteRunde(){ zeigeAuswahl('wechsel'); }
+
+async function rundeFertig(){
+  if(!aktuelleRunde) return;
+  const jetzt = new Date().toISOString();
+  await sendToSheet({ type:'leistung_stop', token: TOKEN, id: aktuelleRunde.id, endZeit: jetzt });
+  aktuelleRunde = null;
+  loescheLokaleRunde();
+  clearInterval(timerInterval);
+  document.getElementById('timerCard').style.display = 'none';
+  document.getElementById('auswahlCard').style.display = 'none';
+  document.getElementById('startWrap').style.display = '';
+  showToast('✅ Runde gespeichert');
+  await ladeRundenHeute();
+}
+
+// ── TIMER-ANZEIGE ────────────────────────────────────────────────────────────
+function zeigeTimer(){
+  document.getElementById('auswahlCard').style.display = 'none';
+  document.getElementById('startWrap').style.display = 'none';
+  document.getElementById('timerCard').style.display = '';
+  document.getElementById('timerKategorieLabel').textContent =
+    aktuelleRunde.kategorie + (aktuelleRunde.projekt ? ' · ' + aktuelleRunde.projekt : '');
+  clearInterval(timerInterval);
+  updateTimerDisplay();
+  timerInterval = setInterval(updateTimerDisplay, 1000);
+}
+function updateTimerDisplay(){
+  const diffMs = Date.now() - new Date(aktuelleRunde.start).getTime();
+  const totalSec = Math.max(0, Math.floor(diffMs/1000));
+  const h = String(Math.floor(totalSec/3600)).padStart(2,'0');
+  const m = String(Math.floor((totalSec%3600)/60)).padStart(2,'0');
+  const s = String(totalSec%60).padStart(2,'0');
+  document.getElementById('timerDisplay').textContent = `${h}:${m}:${s}`;
+  document.getElementById('timerWarnung').style.display = (totalSec > 12*3600) ? '' : 'none';
+}
+
+// ── SENDEN ─────────────────────────────────────────────────────────────────────
+async function sendToSheet(payload){
+  try{
+    await fetch(WEBHOOK_BASE, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+  }catch(e){ console.warn('Fehler beim Senden:', e); }
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────────────
+if(!TOKEN){
+  document.getElementById('tokenError').style.display = '';
+} else {
+  ladeMitarbeiter();
+  ladeProjekte();
+}
+
+// ── SERVICE WORKER (Auto-Update) ──────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').then(reg => {
+    reg.addEventListener('updatefound', () => {
+      const newWorker = reg.installing;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+          const t = document.getElementById('toast');
+          t.textContent = '🔄 Update verfügbar – tippe zum Aktualisieren';
+          t.classList.add('show');
+          t.style.cursor = 'pointer';
+          t.onclick = () => {
+            newWorker.postMessage({ action: 'skipWaiting' });
+            t.classList.remove('show');
+            t.style.cursor = '';
+            t.onclick = null;
+          };
+        }
+      });
+    });
+  });
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
+  });
+}
+</script>
+</body>
+</html>
