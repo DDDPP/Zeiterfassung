@@ -48,7 +48,8 @@
   .submit-wrap{padding:4px 0 8px}
   .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#111;color:#fff;padding:11px 18px;border-radius:999px;font-size:13px;font-weight:500;z-index:200;transition:transform .3s ease;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}
   .toast.show{transform:translateX(-50%) translateY(0)}
-  .runde-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)}
+  .runde-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer}
+  .runde-row:active{background:var(--bg)}
   .runde-row:last-child{border-bottom:none}
   .runde-info{font-size:13px;font-weight:600}
   .runde-projekt{font-size:12px;color:var(--muted);margin-top:1px}
@@ -114,7 +115,35 @@
   <!-- BISHERIGE RUNDEN HEUTE -->
   <div class="form-card" id="heuteCard" style="display:none">
     <div class="card-title">📋 Bisherige Runden heute</div>
+    <div class="card-sub">Zum Bearbeiten oder Löschen antippen</div>
     <div id="heuteListe"></div>
+  </div>
+
+  <!-- RUNDE BEARBEITEN -->
+  <div class="form-card" id="bearbeitenCard" style="display:none">
+    <div class="card-title">✏️ Runde bearbeiten</div>
+    <div class="chip-group" id="editKatChips"></div>
+    <input type="text" class="finput" id="editKatSonstigesText" placeholder="Sonstiges: was genau?" style="display:none;margin-top:8px">
+    <div class="fgroup" style="margin-top:14px">
+      <label class="flabel">Projekt (optional)</label>
+      <select class="finput" id="editProjekt"><option value="">– kein Projekt / nicht zutreffend –</option></select>
+      <input type="text" class="finput" id="editProjektNeu" placeholder="Neuen Projektnamen eintragen" style="display:none;margin-top:8px">
+    </div>
+    <div class="fgroup" style="margin-top:14px;display:flex;gap:8px">
+      <div style="flex:1">
+        <label class="flabel">Start</label>
+        <input type="time" class="finput" id="editStart">
+      </div>
+      <div style="flex:1">
+        <label class="flabel">Ende</label>
+        <input type="time" class="finput" id="editEnde">
+      </div>
+    </div>
+    <div class="timer-actions">
+      <button class="btn-secondary" style="color:var(--red)" onclick="loescheAktuelleRunde()">🗑 Löschen</button>
+      <button class="btn-primary" onclick="speichereBearbeitung()">Speichern</button>
+    </div>
+    <button class="btn-secondary" style="margin-top:8px" onclick="schliesseBearbeiten()">Abbrechen</button>
   </div>
 
 </div><!-- /main -->
@@ -187,6 +216,7 @@ document.getElementById('leMa').addEventListener('change', async function(){
   document.getElementById('auswahlCard').style.display = 'none';
   document.getElementById('startWrap').style.display = aktuellerMA ? '' : 'none';
   document.getElementById('heuteCard').style.display = 'none';
+  schliesseBearbeiten();
   if(aktuellerMA){
     await pruefeAktuelleRunde();
     await ladeRundenHeute();
@@ -215,22 +245,31 @@ async function ladeProjekte(){
   try{
     const res = await fetch(WEBHOOK_BASE + '?action=projekte');
     const data = await res.json();
-    const sel = document.getElementById('leProjekt');
-    sel.innerHTML = '<option value="">– kein Projekt / nicht zutreffend –</option>';
-    (data.projekte || []).forEach(name => { sel.innerHTML += `<option>${name}</option>`; });
-    sel.innerHTML += '<option value="__new__">+ Neues Projekt…</option>';
+    const optionsHtml = '<option value="">– kein Projekt / nicht zutreffend –</option>' +
+      (data.projekte || []).map(name => `<option>${name}</option>`).join('') +
+      '<option value="__new__">+ Neues Projekt…</option>';
+    document.getElementById('leProjekt').innerHTML = optionsHtml;
+    document.getElementById('editProjekt').innerHTML = optionsHtml;
   }catch(e){ console.warn('Projektliste konnte nicht geladen werden:', e); }
 }
 document.getElementById('leProjekt').addEventListener('change', function(){
   document.getElementById('leProjektNeu').style.display = this.value === '__new__' ? '' : 'none';
 });
+document.getElementById('editProjekt').addEventListener('change', function(){
+  document.getElementById('editProjektNeu').style.display = this.value === '__new__' ? '' : 'none';
+});
+
+let letzteRundenHeute = [];
 
 async function ladeRundenHeute(){
   if(!aktuellerMA) return;
   try{
     const res = await fetch(WEBHOOK_BASE + '?action=leistung_heute&mitarbeiter=' + encodeURIComponent(aktuellerMA) + '&token=' + encodeURIComponent(TOKEN));
     const data = await res.json();
-    if(data.status === 'ok'){ renderRundenHeute(data.runden || []); }
+    if(data.status === 'ok'){
+      letzteRundenHeute = data.runden || [];
+      renderRundenHeute(letzteRundenHeute);
+    }
   }catch(e){ console.warn('Tagesübersicht konnte nicht geladen werden:', e); }
 }
 
@@ -245,7 +284,7 @@ function renderRundenHeute(runden){
   if(!runden.length){ card.style.display = 'none'; return; }
   card.style.display = '';
   liste.innerHTML = runden.map(r => `
-    <div class="runde-row">
+    <div class="runde-row" onclick="oeffneBearbeiten('${r.id}')">
       <div>
         <div class="runde-info">${r.kategorie}</div>
         ${r.projekt ? `<div class="runde-projekt">${r.projekt}</div>` : ''}
@@ -268,6 +307,95 @@ function waehleKategorie(k){
   ausgewaehlteKategorie = k;
   renderKatChips();
   document.getElementById('katSonstigesText').style.display = (k === 'Sonstiges') ? '' : 'none';
+}
+
+let bearbeiteteRunde = null;
+let editKategorie = null;
+
+function oeffneBearbeiten(id){
+  const runde = letzteRundenHeute.find(r => r.id === id);
+  if(!runde) return;
+  bearbeiteteRunde = runde;
+
+  if((runde.kategorie || '').startsWith('Sonstiges')){
+    editKategorie = 'Sonstiges';
+    document.getElementById('editKatSonstigesText').style.display = '';
+    document.getElementById('editKatSonstigesText').value = runde.kategorie.replace(/^Sonstiges:\s*/, '');
+  } else {
+    editKategorie = runde.kategorie;
+    document.getElementById('editKatSonstigesText').style.display = 'none';
+    document.getElementById('editKatSonstigesText').value = '';
+  }
+  renderEditKatChips();
+
+  const projektSel = document.getElementById('editProjekt');
+  projektSel.value = [...projektSel.options].some(o => o.value === runde.projekt) ? runde.projekt : '';
+  document.getElementById('editProjektNeu').style.display = 'none';
+  document.getElementById('editProjektNeu').value = '';
+
+  document.getElementById('editStart').value = formatZeitInput(runde.start);
+  document.getElementById('editEnde').value = formatZeitInput(runde.ende);
+
+  document.getElementById('bearbeitenCard').style.display = '';
+  document.getElementById('bearbeitenCard').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function formatZeitInput(iso){
+  const d = new Date(iso);
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+
+function renderEditKatChips(){
+  const c = document.getElementById('editKatChips');
+  c.innerHTML = KATEGORIEN.map(k =>
+    `<button type="button" class="chip ${k===editKategorie?'active':''}" onclick="waehleEditKategorie('${k}')">${k}</button>`
+  ).join('');
+}
+function waehleEditKategorie(k){
+  editKategorie = k;
+  renderEditKatChips();
+  document.getElementById('editKatSonstigesText').style.display = (k === 'Sonstiges') ? '' : 'none';
+}
+
+function schliesseBearbeiten(){
+  bearbeiteteRunde = null;
+  document.getElementById('bearbeitenCard').style.display = 'none';
+}
+
+async function speichereBearbeitung(){
+  if(!bearbeiteteRunde) return;
+  if(!editKategorie){ showToast('⚠️ Bitte Kategorie auswählen'); return; }
+
+  let kategorie = editKategorie;
+  if(kategorie === 'Sonstiges'){
+    const text = document.getElementById('editKatSonstigesText').value.trim();
+    if(!text){ showToast('⚠️ Bitte kurz eintragen, was gemacht wurde'); return; }
+    kategorie = 'Sonstiges: ' + text;
+  }
+
+  let projekt = document.getElementById('editProjekt').value;
+  if(projekt === '__new__'){ projekt = document.getElementById('editProjektNeu').value.trim(); }
+
+  const basisDatum = new Date(bearbeiteteRunde.start);
+  const [hS, mS] = document.getElementById('editStart').value.split(':').map(Number);
+  const [hE, mE] = document.getElementById('editEnde').value.split(':').map(Number);
+  const neuStart = new Date(basisDatum); neuStart.setHours(hS, mS, 0, 0);
+  const neuEnde = new Date(basisDatum); neuEnde.setHours(hE, mE, 0, 0);
+  if(neuEnde <= neuStart){ showToast('⚠️ Ende muss nach Start liegen'); return; }
+
+  await sendToSheet({ type:'leistung_update', token: TOKEN, id: bearbeiteteRunde.id, kategorie, projekt, startZeit: neuStart.toISOString(), endZeit: neuEnde.toISOString() });
+  schliesseBearbeiten();
+  showToast('✅ Runde aktualisiert');
+  await ladeRundenHeute();
+}
+
+async function loescheAktuelleRunde(){
+  if(!bearbeiteteRunde) return;
+  if(!confirm('Diese Runde wirklich löschen?')) return;
+  await sendToSheet({ type:'leistung_delete', token: TOKEN, id: bearbeiteteRunde.id });
+  schliesseBearbeiten();
+  showToast('🗑 Runde gelöscht');
+  await ladeRundenHeute();
 }
 
 function zeigeAuswahl(modus){
