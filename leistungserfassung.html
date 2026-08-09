@@ -1,521 +1,1026 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Leistungserfassung – Garten Hoch 3</title>
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Leistung">
-<meta name="theme-color" content="#2D6A2D">
-<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="180x180" href="apple-touch-icon.png">
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-  :root {
-    --bg:#F7F8FA; --surface:#fff; --border:#E4E7EC; --text:#111827; --muted:#6B7280;
-    --green:#16A34A; --green-light:#DCFCE7; --red:#DC2626; --red-light:#FEE2E2;
-    --blue:#2563EB; --blue-light:#DBEAFE; --orange:#EA580C; --orange-light:#FEF0E7;
-    --purple:#7C3AED; --purple-light:#EDE9FE; --radius:14px;
-    --shadow:0 1px 4px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.06);
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:0 0 48px}
-  .header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 20px 14px;position:sticky;top:0;z-index:10}
-  .header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
-  .logo img{height:34px;width:auto;display:block}
-  .header-title{font-size:15px;font-weight:700}
-  .main{padding:16px 16px 0;max-width:480px;margin:0 auto}
-  .form-card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);border:1.5px solid var(--border);padding:18px;margin-bottom:14px}
-  .card-title{font-size:14px;font-weight:700;margin-bottom:3px;display:flex;align-items:center;gap:6px}
-  .card-sub{font-size:12px;color:var(--muted);margin-bottom:14px}
-  .fgroup{margin-bottom:13px}
-  .fgroup:last-child{margin-bottom:0}
-  .flabel{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:.05em}
-  .finput{width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--text)}
-  .finput:focus{outline:none;border-color:var(--blue)}
-  select.finput{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;cursor:pointer}
-  .chip-group{display:flex;flex-wrap:wrap;gap:6px}
-  .chip{padding:9px 14px;border-radius:999px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:background .1s,color .1s}
-  .chip.active{background:var(--blue);color:#fff;border-color:var(--blue)}
-  .btn-primary{width:100%;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:11px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer}
-  .btn-primary:disabled{opacity:.5;cursor:not-allowed}
-  .btn-secondary{width:100%;padding:14px;background:var(--bg);color:var(--text);border:1.5px solid var(--border);border-radius:11px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer}
-  .timer-display{font-size:44px;font-weight:700;text-align:center;margin:8px 0 4px;letter-spacing:.02em;font-variant-numeric:tabular-nums}
-  .timer-label{text-align:center;font-size:13px;color:var(--muted);margin-bottom:6px}
-  .timer-warning{font-size:12px;color:var(--red);text-align:center;margin-top:6px;display:none}
-  .timer-actions{display:flex;gap:8px;margin-top:16px}
-  .submit-wrap{padding:4px 0 8px}
-  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#111;color:#fff;padding:11px 18px;border-radius:999px;font-size:13px;font-weight:500;z-index:200;transition:transform .3s ease;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}
-  .toast.show{transform:translateX(-50%) translateY(0)}
-  .runde-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer}
-  .runde-row:active{background:var(--bg)}
-  .runde-row:last-child{border-bottom:none}
-  .runde-info{font-size:13px;font-weight:600}
-  .runde-projekt{font-size:12px;color:var(--muted);margin-top:1px}
-  .runde-zeit{font-size:12px;color:var(--muted);text-align:right;white-space:nowrap;margin-left:10px}
-  .runde-dauer{font-size:13px;font-weight:700;text-align:right}
-  .heute-empty{font-size:12px;color:var(--muted);padding:2px 0}
-</style>
-</head>
-<body>
+/**
+ * GARTEN HOCH 3 – Zeiterfassung Webhook
+ * =======================================
+ * Anleitung:
+ * 1. ERST projektTaetigkeitenEinfuegen() ausführen
+ * 2. Dann diesen Code in Apps Script einfügen (alten Code ersetzen)
+ * 3. Speichern → Bereitstellungen verwalten → Stift → Neue Version
+ */
 
-<div class="header">
-  <div class="header-top">
-    <div class="logo"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAATUAAABQCAYAAAB4UeJZAABO7UlEQVR42u19d3hd1ZX22ufce19XtVzoPYkNBLBwt5FIIIFAhklGCpkwZEhmTBIg4Aqk8PRS6aaEOplk0n4zkdImBYKBSOAq+cmU2CaYQIyNcZGs9uot5+zfH/ddWzYusjEQmLe/z5/5hPzKueesvffaa+8DlK1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2f6uQY0ZRARmTorlnZkvGoYxz7KM46MxEyCgWHBRyDlzpky6/a4gmisDW7nKVrayvaNGEYnEkYUy5mSOa+ybmecS+fmiYRjzLMs4PhozAQKKBReFnDNnyqTb7wqiuTKwlatsZXunLeL3ew0NE5iZfb/QlanRgLBIeTfeVMHgYAAJIyMDW7nKVra3+//jY1JLzQVoAAAAAElFTkSuQmCC" alt="Garten Hoch 3"></div>
-  </div>
-  <div class="header-title">⏱️ Leistungserfassung</div>
-</div>
+// ── KONFIGURATION ─────────────────────────────────────────────────────────────
+const COL_DATUM       = 1;   // A
+const COL_WOCHENTAG   = 2;   // B
+const COL_TYP         = 3;   // C
+const COL_BEGINN      = 4;   // D
+const COL_ENDE        = 5;   // E
+const COL_PAUSE       = 6;   // F
+const COL_ARBEITSZEIT = 7;   // G
+const COL_PROJEKT     = 8;   // H  (war: Notiz)
+const COL_TAETIGKEITEN= 9;   // I  (NEU)
 
-<div class="main">
-  <br>
+// Schicht 2 (alle um 1 nach rechts verschoben)
+const COL_BEGINN2     = 10;  // J
+const COL_ENDE2       = 11;  // K
+const COL_PAUSE2      = 12;  // L
+const COL_NETTO2      = 13;  // M
 
-  <div class="form-card" id="tokenError" style="display:none;border-color:var(--red)">
-    <div class="card-title" style="color:var(--red)">⚠️ Ungültiger Zugang</div>
-    <div class="card-sub">Bitte den vollständigen Link mit Zugangscode verwenden.</div>
-  </div>
+// Schicht 3
+const COL_BEGINN3     = 14;  // N
+const COL_ENDE3       = 15;  // O
+const COL_PAUSE3      = 16;  // P
+const COL_NETTO3      = 17;  // Q
 
-  <!-- MITARBEITER -->
-  <div class="form-card">
-    <div class="fgroup" style="margin-bottom:0">
-      <label class="flabel">Wer bist du?</label>
-      <select class="finput" id="leMa"><option value="">– auswählen –</option></select>
-    </div>
-  </div>
+// Standorte
+const COL_STANDORT1   = 18;  // R
+const COL_STANDORT2   = 19;  // S
+const COL_STANDORT3   = 20;  // T
 
-  <!-- START-BUTTON (initialer Zustand) -->
-  <div class="submit-wrap" id="startWrap">
-    <button class="btn-primary" id="startBtn" onclick="zeigeAuswahl('start')" disabled>▶️ Runde starten</button>
-  </div>
+// ── EINSTELLUNGEN-TAB (Mitarbeiterliste + Zugangs-Tokens) ─────────────────────
+const COL_EINST_NAME   = 1; // A
+const COL_EINST_STATUS = 2; // B
+const COL_EINST_TOKEN  = 3; // C
 
-  <!-- KATEGORIE/PROJEKT-AUSWAHL -->
-  <div class="form-card" id="auswahlCard" style="display:none">
-    <div class="card-title">⏱️ Was machst du gerade?</div>
-    <div class="chip-group" id="katChips"></div>
-    <input type="text" class="finput" id="katSonstigesText" placeholder="Sonstiges: was genau?" style="display:none;margin-top:8px">
-    <div class="fgroup" style="margin-top:14px">
-      <label class="flabel">Projekt (optional)</label>
-      <select class="finput" id="leProjekt"><option value="">– kein Projekt / nicht zutreffend –</option></select>
-      <input type="text" class="finput" id="leProjektNeu" placeholder="Neuen Projektnamen eintragen" style="display:none;margin-top:8px">
-    </div>
-    <button class="btn-primary" id="bestaetigenBtn" style="margin-top:16px" onclick="bestaetigeAuswahl()">Starten</button>
-  </div>
+// ── MITARBEITERLISTE ──────────────────────────────────────────────────────────
+function getMitarbeiterTabs() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("⚙️ Einstellungen");
+  if (!sheet) throw new Error("Tab '⚙️ Einstellungen' nicht gefunden!");
 
-  <!-- LAUFENDER TIMER -->
-  <div class="form-card" id="timerCard" style="display:none">
-    <div class="timer-label" id="timerKategorieLabel"></div>
-    <div class="timer-display" id="timerDisplay">00:00:00</div>
-    <div class="timer-warning" id="timerWarnung">⚠️ Läuft seit über 12 Std. – vergessen zu stoppen? Bitte bei Bedarf im Sheet korrigieren.</div>
-    <div class="timer-actions">
-      <button class="btn-secondary" onclick="naechsteRunde()">🔄 Nächste Runde</button>
-      <button class="btn-primary" onclick="rundeFertig()">✅ Fertig</button>
-    </div>
-  </div>
-
-  <!-- BISHERIGE RUNDEN HEUTE -->
-  <div class="form-card" id="heuteCard" style="display:none">
-    <div class="card-title">📋 Bisherige Runden heute</div>
-    <div class="card-sub">Zum Bearbeiten oder Löschen antippen</div>
-    <div id="heuteListe"></div>
-  </div>
-
-  <!-- RUNDE BEARBEITEN -->
-  <div class="form-card" id="bearbeitenCard" style="display:none">
-    <div class="card-title">✏️ Runde bearbeiten</div>
-    <div class="chip-group" id="editKatChips"></div>
-    <input type="text" class="finput" id="editKatSonstigesText" placeholder="Sonstiges: was genau?" style="display:none;margin-top:8px">
-    <div class="fgroup" style="margin-top:14px">
-      <label class="flabel">Projekt (optional)</label>
-      <select class="finput" id="editProjekt"><option value="">– kein Projekt / nicht zutreffend –</option></select>
-      <input type="text" class="finput" id="editProjektNeu" placeholder="Neuen Projektnamen eintragen" style="display:none;margin-top:8px">
-    </div>
-    <div class="fgroup" style="margin-top:14px;display:flex;gap:8px">
-      <div style="flex:1">
-        <label class="flabel">Start</label>
-        <input type="time" class="finput" id="editStart">
-      </div>
-      <div style="flex:1">
-        <label class="flabel">Ende</label>
-        <input type="time" class="finput" id="editEnde">
-      </div>
-    </div>
-    <div class="timer-actions">
-      <button class="btn-secondary" style="color:var(--red)" onclick="loescheAktuelleRunde()">🗑 Löschen</button>
-      <button class="btn-primary" onclick="speichereBearbeitung()">Speichern</button>
-    </div>
-    <button class="btn-secondary" style="margin-top:8px" onclick="schliesseBearbeiten()">Abbrechen</button>
-  </div>
-
-</div><!-- /main -->
-
-<div class="toast" id="toast"></div>
-
-<script>
-const WEBHOOK_BASE = 'https://script.google.com/macros/s/AKfycbw1AOqcgtunqJpDKU59VTJkn5TWr1xMip90EA5iOYf-FdcOASCcocZRMqO4IRPicCZf/exec';
-const TOKEN = new URLSearchParams(window.location.search).get('token') || '';
-
-const KATEGORIEN = [
-  'Rüstzeit','Fahrzeit','Baustellenzeit','Lagerarbeit','Kundenakquise',
-  'Besorgungsfahrt','Entsorgungsfahrt','Maschineninstandhaltung','Sonstiges'
-];
-
-let aktuellerMA = '';
-let aktuelleRunde = null;
-let timerInterval = null;
-let ausgewaehlteKategorie = null;
-let auswahlModus = 'start';
-
-let toastT;
-function showToast(msg){
-  const t=document.getElementById('toast');
-  t.textContent=msg; t.classList.add('show');
-  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2800);
+  const werte = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+  const tabs = {};
+  werte.forEach(row => {
+    const name   = row[0].toString().trim();
+    const status = row[1].toString().trim().toLowerCase();
+    if (name && status === "aktiv") tabs[name] = name;
+  });
+  return tabs;
 }
 
-function ladeLokaleRunde(){
-  try{ const raw = localStorage.getItem('gh3_le_runde'); return raw ? JSON.parse(raw) : null; }
-  catch(e){ return null; }
-}
-function speichereLokaleRunde(r){
-  try{ localStorage.setItem('gh3_le_runde', JSON.stringify(r)); }catch(e){}
-}
-function loescheLokaleRunde(){
-  try{ localStorage.removeItem('gh3_le_runde'); }catch(e){}
-}
-function neueId(){
-  return (crypto.randomUUID) ? crypto.randomUUID() : ('id-' + Date.now() + '-' + Math.random().toString(16).slice(2));
-}
-
-async function ladeMitarbeiter(){
-  try{
-    const res = await fetch(WEBHOOK_BASE + '?action=leistung_mitarbeiter&token=' + encodeURIComponent(TOKEN));
-    const data = await res.json();
-    if(data.status !== 'ok'){ showToast('⚠️ Zugang ungültig – bitte Link prüfen'); return; }
-    const sel = document.getElementById('leMa');
-    sel.innerHTML = '<option value="">– auswählen –</option>';
-    (data.mitarbeiter || []).forEach(name => { sel.innerHTML += `<option>${name}</option>`; });
-    let last; try{ last = localStorage.getItem('gh3_le_lastMA'); }catch(e){}
-    if(last && [...sel.options].some(o => o.value === last)){
-      sel.value = last;
-      aktuellerMA = last;
-      document.getElementById('startBtn').disabled = false;
-      document.getElementById('startWrap').style.display = '';
-      await pruefeAktuelleRunde();
-      await ladeRundenHeute();
+// ── TOKEN-BASIERTER ZUGRIFFSSCHUTZ ────────────────────────────────────────────
+// Ein Token ersetzt den alten Klarnamen-Parameter (?ma=Name) in den persönlichen
+// Links. Nur wer den zufälligen Token kennt, kommt an den passenden Namen.
+function getNameByToken(token) {
+  if (!token) return null;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("⚙️ Einstellungen");
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return null;
+  const data = sheet.getRange(2, 1, lastRow - 1, 3).getValues();
+  for (let i = 0; i < data.length; i++) {
+    if (data[i][2] && data[i][2].toString().trim() === token.toString().trim()) {
+      return data[i][0].toString().trim();
     }
-  }catch(e){ console.warn('Mitarbeiterliste konnte nicht geladen werden:', e); showToast('⚠️ Verbindung fehlgeschlagen'); }
-}
-
-document.getElementById('leMa').addEventListener('change', async function(){
-  aktuellerMA = this.value;
-  try{ localStorage.setItem('gh3_le_lastMA', aktuellerMA); }catch(e){}
-  document.getElementById('startBtn').disabled = !aktuellerMA;
-  clearInterval(timerInterval);
-  aktuelleRunde = null;
-  document.getElementById('timerCard').style.display = 'none';
-  document.getElementById('auswahlCard').style.display = 'none';
-  document.getElementById('startWrap').style.display = aktuellerMA ? '' : 'none';
-  document.getElementById('heuteCard').style.display = 'none';
-  schliesseBearbeiten();
-  if(aktuellerMA){
-    await pruefeAktuelleRunde();
-    await ladeRundenHeute();
   }
-});
+  return null;
+}
 
-async function pruefeAktuelleRunde(){
-  const lokal = ladeLokaleRunde();
-  if(lokal && lokal.mitarbeiter === aktuellerMA){
-    aktuelleRunde = lokal;
-    zeigeTimer();
-    return;
+// Einmalig ausführen: vergibt an jeden aktiven Mitarbeiter ohne Token einen neuen
+function generateTokensEinmalig() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("⚙️ Einstellungen");
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+  const data = sheet.getRange(2, 1, lastRow - 1, 3).getValues();
+  data.forEach((row, i) => {
+    const status = row[1].toString().trim().toLowerCase();
+    const token = row[2];
+    if (status === "aktiv" && !token) {
+      const neuerToken = Utilities.getUuid().replace(/-/g, '').substring(0, 12);
+      sheet.getRange(i + 2, COL_EINST_TOKEN).setValue(neuerToken);
+    }
+  });
+  Logger.log("✅ Tokens vergeben/geprüft.");
+}
+
+// Praktisch zur Erstellung/Aktualisierung des Zugangslinks-Dokuments:
+// gibt im Logger jede Zeile "Name: vollständiger Link" aus, zum Copy-Paste.
+function tokenLinksAnzeigen() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("⚙️ Einstellungen");
+  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getValues();
+  const baseUrl = "https://dddpp.github.io/Zeiterfassung/zeiterfassung.html";
+  data.forEach(row => {
+    if (row[1].toString().trim().toLowerCase() === "aktiv" && row[2]) {
+      Logger.log(row[0] + ": " + baseUrl + "?token=" + row[2]);
+    }
+  });
+}
+
+// ── WEBHOOK EMPFANG ───────────────────────────────────────────────────────────
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const result = verarbeiteEintrag(data);
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: "ok", message: result }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    Logger.log("FEHLER doPost: " + err.toString());
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
   }
-  try{
-    const res = await fetch(WEBHOOK_BASE + '?action=leistung_offene_runde&mitarbeiter=' + encodeURIComponent(aktuellerMA) + '&token=' + encodeURIComponent(TOKEN));
-    const data = await res.json();
-    if(data.status === 'ok' && data.runde){
-      aktuelleRunde = { id: data.runde.id, mitarbeiter: aktuellerMA, kategorie: data.runde.kategorie, projekt: data.runde.projekt, start: data.runde.start };
-      speichereLokaleRunde(aktuelleRunde);
-      zeigeTimer();
+}
+
+function doGet(e) {
+  if (e && e.parameter && e.parameter.action === "mitarbeiter") {
+    try {
+      const tabs = getMitarbeiterTabs();
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: "ok", mitarbeiter: Object.keys(tabs) }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch(err) {
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+        .setMimeType(ContentService.MimeType.JSON);
     }
-  }catch(e){ console.warn('Konnte offene Runde nicht prüfen:', e); }
-}
-
-async function ladeProjekte(){
-  try{
-    const res = await fetch(WEBHOOK_BASE + '?action=projekte');
-    const data = await res.json();
-    const optionsHtml = '<option value="">– kein Projekt / nicht zutreffend –</option>' +
-      (data.projekte || []).map(name => `<option>${name}</option>`).join('') +
-      '<option value="__new__">+ Neues Projekt…</option>';
-    document.getElementById('leProjekt').innerHTML = optionsHtml;
-    document.getElementById('editProjekt').innerHTML = optionsHtml;
-  }catch(e){ console.warn('Projektliste konnte nicht geladen werden:', e); }
-}
-document.getElementById('leProjekt').addEventListener('change', function(){
-  document.getElementById('leProjektNeu').style.display = this.value === '__new__' ? '' : 'none';
-});
-document.getElementById('editProjekt').addEventListener('change', function(){
-  document.getElementById('editProjektNeu').style.display = this.value === '__new__' ? '' : 'none';
-});
-
-let letzteRundenHeute = [];
-
-async function ladeRundenHeute(){
-  if(!aktuellerMA) return;
-  try{
-    const res = await fetch(WEBHOOK_BASE + '?action=leistung_heute&mitarbeiter=' + encodeURIComponent(aktuellerMA) + '&token=' + encodeURIComponent(TOKEN));
-    const data = await res.json();
-    if(data.status === 'ok'){
-      letzteRundenHeute = data.runden || [];
-      renderRundenHeute(letzteRundenHeute);
+  }
+  if (e && e.parameter && e.parameter.action === "projekte") {
+    try {
+      const projekte = getProjekte();
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: "ok", projekte: projekte }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch(err) {
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+        .setMimeType(ContentService.MimeType.JSON);
     }
-  }catch(e){ console.warn('Tagesübersicht konnte nicht geladen werden:', e); }
+  }
+  // ── NEU: Leistungserfassung ──────────────────────────────────────────────
+  if (e && e.parameter && e.parameter.action === "leistung_mitarbeiter") {
+    try {
+      if (!pruefeLeistungToken_(e.parameter.token)) throw new Error("Ungültiger Zugang");
+      const tabs = getMitarbeiterTabs();
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: "ok", mitarbeiter: Object.keys(tabs) }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch(err) {
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+  if (e && e.parameter && e.parameter.action === "leistung_offene_runde") {
+    try {
+      if (!pruefeLeistungToken_(e.parameter.token)) throw new Error("Ungültiger Zugang");
+      const offene = findeOffeneRunde_(e.parameter.mitarbeiter);
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: "ok", runde: offene }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch(err) {
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+  if (e && e.parameter && e.parameter.action === "leistung_heute") {
+    try {
+      if (!pruefeLeistungToken_(e.parameter.token)) throw new Error("Ungültiger Zugang");
+      const runden = findeRundenHeute_(e.parameter.mitarbeiter);
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: "ok", runden: runden }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch(err) {
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+  // ── ENDE NEU ──────────────────────────────────────────────────────────────
+  if (e && e.parameter && e.parameter.action === "resolve") {
+    // Löst einen Token in den zugehörigen Mitarbeiternamen auf (fürs Frontend).
+    const name = getNameByToken(e.parameter.token);
+    return ContentService
+      .createTextOutput(JSON.stringify(name ? { status: "ok", name: name } : { status: "error", message: "Ungültiger Zugang" }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  return ContentService
+    .createTextOutput(JSON.stringify({ status: "ok", message: "Webhook aktiv ✓" }))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
-function formatUhrzeit(iso){
-  const d = new Date(iso);
-  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
-}
+// ── EINTRAG VERARBEITEN ───────────────────────────────────────────────────────
+function verarbeiteEintrag(data) {
+  // Baustellenbericht hat eine eigene Logik (kein Mitarbeiter-Tab,
+  // kein Datums-Zeilen-Lookup – es wird immer eine neue Zeile angehängt)
+  if (data.type === "baustellenbericht") {
+    return verarbeiteBaustellenbericht(data);
+  }
 
-function renderRundenHeute(runden){
-  const card = document.getElementById('heuteCard');
-  const liste = document.getElementById('heuteListe');
-  if(!runden.length){ card.style.display = 'none'; return; }
-  card.style.display = '';
-  liste.innerHTML = runden.map(r => `
-    <div class="runde-row" onclick="oeffneBearbeiten('${r.id}')">
-      <div>
-        <div class="runde-info">${r.kategorie}</div>
-        ${r.projekt ? `<div class="runde-projekt">${r.projekt}</div>` : ''}
-      </div>
-      <div>
-        <div class="runde-dauer">${r.dauerMin} Min</div>
-        <div class="runde-zeit">${formatUhrzeit(r.start)}–${formatUhrzeit(r.ende)}</div>
-      </div>
-    </div>
-  `).join('');
-}
+  // NEU: Leistungserfassung hat ebenfalls eigene Logik (eigener Token,
+  // eigener Tab, kein Mitarbeiter-Tab-Lookup)
+  if (data.type === "leistung_start" || data.type === "leistung_stop" || data.type === "leistung_wechsel" || data.type === "leistung_update" || data.type === "leistung_delete") {
+    return verarbeiteLeistung(data);
+  }
 
-function renderKatChips(){
-  const c = document.getElementById('katChips');
-  c.innerHTML = KATEGORIEN.map(k =>
-    `<button type="button" class="chip ${k===ausgewaehlteKategorie?'active':''}" onclick="waehleKategorie('${k}')">${k}</button>`
-  ).join('');
-}
-function waehleKategorie(k){
-  ausgewaehlteKategorie = k;
-  renderKatChips();
-  document.getElementById('katSonstigesText').style.display = (k === 'Sonstiges') ? '' : 'none';
-}
+  // Token-Prüfung: wenn ein Token mitgeschickt wird, bestimmt SERVERSEITIG
+  // der Token den Namen – ein im Frontend manipulierter data.name wird
+  // dadurch ignoriert/überschrieben. Kein Token (Chef-Ansicht) = wie bisher.
+  if (data.token) {
+    const nameAusToken = getNameByToken(data.token);
+    if (!nameAusToken) throw new Error("Ungültiger Zugang (Token)");
+    data.name = nameAusToken;
+  }
 
-let bearbeiteteRunde = null;
-let editKategorie = null;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const MITARBEITER_TABS = getMitarbeiterTabs();
+  const tabName = MITARBEITER_TABS[data.name];
+  if (!tabName) throw new Error("Unbekannter Mitarbeiter: " + data.name);
 
-function oeffneBearbeiten(id){
-  const runde = letzteRundenHeute.find(r => r.id === id);
-  if(!runde) return;
-  bearbeiteteRunde = runde;
+  const sheet = ss.getSheetByName(tabName);
+  if (!sheet) throw new Error("Tab nicht gefunden: " + tabName);
 
-  if((runde.kategorie || '').startsWith('Sonstiges')){
-    editKategorie = 'Sonstiges';
-    document.getElementById('editKatSonstigesText').style.display = '';
-    document.getElementById('editKatSonstigesText').value = runde.kategorie.replace(/^Sonstiges:\s*/, '');
+  const parts = data.date.split("-");
+  const zielTag   = parseInt(parts[2]);
+  const zielMonat = parseInt(parts[1]);
+  const zielJahr  = parseInt(parts[0]);
+
+  const zeile = findeZeile(sheet, zielTag, zielMonat, zielJahr);
+  if (!zeile) throw new Error("Datum nicht gefunden: " + data.date);
+
+  if (data.type === "work") {
+    return verarbeiteArbeitstag(sheet, zeile, data);
+  } else if (data.type === "Urlaub" || data.type === "Krank") {
+    return verarbeiteAbwesenheit(sheet, zeile, data);
   } else {
-    editKategorie = runde.kategorie;
-    document.getElementById('editKatSonstigesText').style.display = 'none';
-    document.getElementById('editKatSonstigesText').value = '';
+    throw new Error("Unbekannter Typ: " + data.type);
   }
-  renderEditKatChips();
-
-  const projektSel = document.getElementById('editProjekt');
-  projektSel.value = [...projektSel.options].some(o => o.value === runde.projekt) ? runde.projekt : '';
-  document.getElementById('editProjektNeu').style.display = 'none';
-  document.getElementById('editProjektNeu').value = '';
-
-  document.getElementById('editStart').value = formatZeitInput(runde.start);
-  document.getElementById('editEnde').value = formatZeitInput(runde.ende);
-
-  document.getElementById('bearbeitenCard').style.display = '';
-  document.getElementById('bearbeitenCard').scrollIntoView({behavior:'smooth', block:'nearest'});
 }
 
-function formatZeitInput(iso){
-  const d = new Date(iso);
-  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+// ── DATUM SUCHEN ──────────────────────────────────────────────────────────────
+function findeZeile(sheet, zielTag, zielMonat, zielJahr) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return null;
+
+  const angezeigt = sheet.getRange(2, COL_DATUM, lastRow - 1, 1).getDisplayValues();
+  const zielStr = String(zielTag).padStart(2,"0") + "." +
+                  String(zielMonat).padStart(2,"0") + "." + zielJahr;
+
+  for (let i = 0; i < angezeigt.length; i++) {
+    const str = angezeigt[i][0];
+    if (str && str.trim() === zielStr) return i + 2;
+  }
+  return null;
 }
 
-function renderEditKatChips(){
-  const c = document.getElementById('editKatChips');
-  c.innerHTML = KATEGORIEN.map(k =>
-    `<button type="button" class="chip ${k===editKategorie?'active':''}" onclick="waehleEditKategorie('${k}')">${k}</button>`
-  ).join('');
-}
-function waehleEditKategorie(k){
-  editKategorie = k;
-  renderEditKatChips();
-  document.getElementById('editKatSonstigesText').style.display = (k === 'Sonstiges') ? '' : 'none';
+// ── STANDORT FORMATIEREN ──────────────────────────────────────────────────────
+function formatStandort(location) {
+  if (!location || !location.lat) return "";
+  const lat = location.lat.toFixed(6);
+  const lng = location.lng.toFixed(6);
+  const acc = location.accuracy ? Math.round(location.accuracy) + "m" : "";
+  return "https://maps.google.com/?q=" + lat + "," + lng + (acc ? " (±" + acc + ")" : "");
 }
 
-function schliesseBearbeiten(){
-  bearbeiteteRunde = null;
-  document.getElementById('bearbeitenCard').style.display = 'none';
-}
+// ── ARBEITSTAG ────────────────────────────────────────────────────────────────
+function verarbeiteArbeitstag(sheet, zeile, data) {
+  const typZelle = sheet.getRange(zeile, COL_TYP);
+  if (!typZelle.getFormula()) typZelle.setValue("Arbeitstag");
 
-async function speichereBearbeitung(){
-  if(!bearbeiteteRunde) return;
-  if(!editKategorie){ showToast('⚠️ Bitte Kategorie auswählen'); return; }
+  const shifts = data.shifts || [];
 
-  let kategorie = editKategorie;
-  if(kategorie === 'Sonstiges'){
-    const text = document.getElementById('editKatSonstigesText').value.trim();
-    if(!text){ showToast('⚠️ Bitte kurz eintragen, was gemacht wurde'); return; }
-    kategorie = 'Sonstiges: ' + text;
+  // Schicht 1
+  if (shifts[0]) {
+    if (shifts[0].start) sheet.getRange(zeile, COL_BEGINN).setValue(shifts[0].start);
+    if (shifts[0].end) {
+      sheet.getRange(zeile, COL_ENDE).setValue(shifts[0].end);
+      sheet.getRange(zeile, COL_PAUSE).setValue(shifts[0].pause || 0);
+    }
+    const s1 = formatStandort(shifts[0].location);
+    if (s1) sheet.getRange(zeile, COL_STANDORT1).setValue(s1);
   }
 
-  let projekt = document.getElementById('editProjekt').value;
-  if(projekt === '__new__'){ projekt = document.getElementById('editProjektNeu').value.trim(); }
-
-  const basisDatum = new Date(bearbeiteteRunde.start);
-  const [hS, mS] = document.getElementById('editStart').value.split(':').map(Number);
-  const [hE, mE] = document.getElementById('editEnde').value.split(':').map(Number);
-  const neuStart = new Date(basisDatum); neuStart.setHours(hS, mS, 0, 0);
-  const neuEnde = new Date(basisDatum); neuEnde.setHours(hE, mE, 0, 0);
-  if(neuEnde <= neuStart){ showToast('⚠️ Ende muss nach Start liegen'); return; }
-
-  await sendToSheet({ type:'leistung_update', token: TOKEN, id: bearbeiteteRunde.id, kategorie, projekt, startZeit: neuStart.toISOString(), endZeit: neuEnde.toISOString() });
-  schliesseBearbeiten();
-  showToast('✅ Runde aktualisiert');
-  await ladeRundenHeute();
-}
-
-async function loescheAktuelleRunde(){
-  if(!bearbeiteteRunde) return;
-  if(!confirm('Diese Runde wirklich löschen?')) return;
-  await sendToSheet({ type:'leistung_delete', token: TOKEN, id: bearbeiteteRunde.id });
-  schliesseBearbeiten();
-  showToast('🗑 Runde gelöscht');
-  await ladeRundenHeute();
-}
-
-function zeigeAuswahl(modus){
-  auswahlModus = modus;
-  ausgewaehlteKategorie = null;
-  document.getElementById('katSonstigesText').value = '';
-  document.getElementById('katSonstigesText').style.display = 'none';
-  renderKatChips();
-  document.getElementById('leProjekt').value = '';
-  document.getElementById('leProjektNeu').style.display = 'none';
-  document.getElementById('leProjektNeu').value = '';
-  document.getElementById('bestaetigenBtn').textContent = modus === 'start' ? 'Starten' : 'Wechseln';
-  document.getElementById('auswahlCard').style.display = '';
-  document.getElementById('startWrap').style.display = 'none';
-  document.getElementById('timerCard').style.display = 'none';
-}
-
-async function bestaetigeAuswahl(){
-  if(!ausgewaehlteKategorie){ showToast('⚠️ Bitte auswählen, was du gerade machst'); return; }
-
-  let kategorie = ausgewaehlteKategorie;
-  if(kategorie === 'Sonstiges'){
-    const text = document.getElementById('katSonstigesText').value.trim();
-    if(!text){ showToast('⚠️ Bitte kurz eintragen, was du machst'); return; }
-    kategorie = 'Sonstiges: ' + text;
+  // Schicht 2
+  if (shifts[1]) {
+    if (shifts[1].start) sheet.getRange(zeile, COL_BEGINN2).setValue(shifts[1].start);
+    if (shifts[1].end) {
+      sheet.getRange(zeile, COL_ENDE2).setValue(shifts[1].end);
+      sheet.getRange(zeile, COL_PAUSE2).setValue(shifts[1].pause || 0);
+      sheet.getRange(zeile, COL_NETTO2).setValue(Math.round(shifts[1].net || 0) / 60);
+    }
+    const s2 = formatStandort(shifts[1].location);
+    if (s2) sheet.getRange(zeile, COL_STANDORT2).setValue(s2);
   }
 
-  let projekt = document.getElementById('leProjekt').value;
-  if(projekt === '__new__'){ projekt = document.getElementById('leProjektNeu').value.trim(); }
-
-  const jetzt = new Date().toISOString();
-  const id = neueId();
-
-  if(auswahlModus === 'start'){
-    aktuelleRunde = { id, mitarbeiter: aktuellerMA, kategorie, projekt, start: jetzt };
-    await sendToSheet({ type:'leistung_start', token: TOKEN, id, mitarbeiter: aktuellerMA, kategorie, projekt, startZeit: jetzt });
-  } else {
-    const alteId = aktuelleRunde.id;
-    await sendToSheet({ type:'leistung_wechsel', token: TOKEN, id: alteId, mitarbeiter: aktuellerMA, endZeit: jetzt, neue: { id, kategorie, projekt, startZeit: jetzt } });
-    aktuelleRunde = { id, mitarbeiter: aktuellerMA, kategorie, projekt, start: jetzt };
+  // Schicht 3
+  if (shifts[2]) {
+    if (shifts[2].start) sheet.getRange(zeile, COL_BEGINN3).setValue(shifts[2].start);
+    if (shifts[2].end) {
+      sheet.getRange(zeile, COL_ENDE3).setValue(shifts[2].end);
+      sheet.getRange(zeile, COL_PAUSE3).setValue(shifts[2].pause || 0);
+      sheet.getRange(zeile, COL_NETTO3).setValue(Math.round(shifts[2].net || 0) / 60);
+    }
+    const s3 = formatStandort(shifts[2].location);
+    if (s3) sheet.getRange(zeile, COL_STANDORT3).setValue(s3);
   }
 
-  speichereLokaleRunde(aktuelleRunde);
-  zeigeTimer();
-  await ladeRundenHeute();
+  // Gesamtarbeitszeit
+  const azZelle = sheet.getRange(zeile, COL_ARBEITSZEIT);
+  const totalNet = shifts.reduce((sum, s) => sum + (s.net || 0), 0);
+  azZelle.setValue(Math.round(totalNet) / 60);
+
+  // Projekt (note)
+  if (data.note) sheet.getRange(zeile, COL_PROJEKT).setValue(data.note);
+
+  // Tätigkeiten
+  if (data.taetigkeiten) sheet.getRange(zeile, COL_TAETIGKEITEN).setValue(data.taetigkeiten);
+
+  return "✅ Arbeitstag gespeichert: " + data.name + " " + data.date;
 }
 
-function naechsteRunde(){ zeigeAuswahl('wechsel'); }
+// ── ABWESENHEIT ───────────────────────────────────────────────────────────────
+function verarbeiteAbwesenheit(sheet, zeile, data) {
+  const typZelle = sheet.getRange(zeile, COL_TYP);
+  if (!typZelle.getFormula()) typZelle.setValue(data.type);
 
-async function rundeFertig(){
-  if(!aktuelleRunde) return;
-  const jetzt = new Date().toISOString();
-  await sendToSheet({ type:'leistung_stop', token: TOKEN, id: aktuelleRunde.id, endZeit: jetzt });
-  aktuelleRunde = null;
-  loescheLokaleRunde();
-  clearInterval(timerInterval);
-  document.getElementById('timerCard').style.display = 'none';
-  document.getElementById('auswahlCard').style.display = 'none';
-  document.getElementById('startWrap').style.display = '';
-  showToast('✅ Runde gespeichert');
-  await ladeRundenHeute();
+  sheet.getRange(zeile, COL_BEGINN).setValue("");
+  sheet.getRange(zeile, COL_ENDE).setValue("");
+  sheet.getRange(zeile, COL_PAUSE).setValue("");
+
+  const azZelle = sheet.getRange(zeile, COL_ARBEITSZEIT);
+  if (!azZelle.getFormula()) azZelle.setValue("");
+
+  return "✅ " + data.type + " gespeichert: " + data.name + " " + data.date;
 }
 
-function zeigeTimer(){
-  document.getElementById('auswahlCard').style.display = 'none';
-  document.getElementById('startWrap').style.display = 'none';
-  document.getElementById('timerCard').style.display = '';
-  document.getElementById('timerKategorieLabel').textContent =
-    aktuelleRunde.kategorie + (aktuelleRunde.projekt ? ' · ' + aktuelleRunde.projekt : '');
-  clearInterval(timerInterval);
-  updateTimerDisplay();
-  timerInterval = setInterval(updateTimerDisplay, 1000);
-}
-function updateTimerDisplay(){
-  const diffMs = Date.now() - new Date(aktuelleRunde.start).getTime();
-  const totalSec = Math.max(0, Math.floor(diffMs/1000));
-  const h = String(Math.floor(totalSec/3600)).padStart(2,'0');
-  const m = String(Math.floor((totalSec%3600)/60)).padStart(2,'0');
-  const s = String(totalSec%60).padStart(2,'0');
-  document.getElementById('timerDisplay').textContent = `${h}:${m}:${s}`;
-  document.getElementById('timerWarnung').style.display = (totalSec > 12*3600) ? '' : 'none';
+// ── TEST ──────────────────────────────────────────────────────────────────────
+function testWebhook() {
+  const testDaten = {
+    name:  "Testperson1",
+    date:  "2026-07-14",
+    type:  "work",
+    shifts: [
+      {start: "07:30", end: "16:00", pause: 30, net: 480,
+       location: {lat: 51.2562, lng: 7.1508, accuracy: 12}}
+    ],
+    note:        "Kunde Müller",
+    taetigkeiten: "Rasenmähen, Heckenschnitt"
+  };
+  Logger.log(verarbeiteEintrag(testDaten));
 }
 
-async function sendToSheet(payload){
-  try{
-    await fetch(WEBHOOK_BASE, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-  }catch(e){ console.warn('Fehler beim Senden:', e); }
+// ============================================================
+// BAUSTELLENBERICHT – Spalten-Konfiguration + Tab-/Ordnernamen
+// ============================================================
+const COL_BB_DATUM       = 1;   // A
+const COL_BB_PROJEKT     = 2;   // B
+const COL_BB_ERFASSTVON  = 3;   // C
+const COL_BB_ZEITSTEMPEL = 4;   // D
+const COL_BB_G1_STD      = 5;   // E  Gruppe 1: Bohrmaschine/Stichsäge/Flex/Akkuschrauber/Pumpe
+const COL_BB_G1_WAS      = 6;   // F
+const COL_BB_G2_STD      = 7;   // G  Gruppe 2: Vertikutierer/Freischneider/Puster/Rüttelplatte/Stampfer
+const COL_BB_G2_WAS      = 8;   // H
+const COL_BB_G3_STD      = 9;   // I  Gruppe 3: Rasenmäher/Heckenschere/Motorsäge/Schneidetisch/Kappsäge/Handkreissäge
+const COL_BB_G3_WAS      = 10;  // J
+const COL_BB_G4_STD      = 11;  // K  Gruppe 4: Bagger
+const COL_BB_G4_WAS      = 12;  // L
+const COL_BB_G5_STD      = 13;  // M  Gruppe 5: Weitere
+const COL_BB_G5_WAS      = 14;  // N
+const COL_BB_FAHRTEN     = 15;  // O  Besorgungs-/Entsorgungsfahrten
+const COL_BB_BELEGE      = 16;  // P  Quittungen/Lieferscheine/Rechnungen
+const COL_BB_FOTOS       = 17;  // Q  Foto-Links (Google Drive)
+const COL_BB_NOTIZEN     = 18;  // R  Bemerkungen & Notizen
+
+const BAUSTELLENBERICHTE_TAB = "Baustellenberichte";
+const PROJEKTE_TAB           = "Projekte";
+const BELEGE_ORDNER          = "Baustellenberichte_Belege";
+
+// ── PROJEKTLISTE LESEN (nur "aktiv") ──────────────────────────────────────────
+function getProjekte() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(PROJEKTE_TAB);
+  if (!sheet) return [];
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  const werte = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+  return werte
+    .filter(r => r[0] && r[1].toString().trim().toLowerCase() === "aktiv")
+    .map(r => r[0].toString().trim());
 }
 
-if(!TOKEN){
-  document.getElementById('tokenError').style.display = '';
-} else {
-  ladeMitarbeiter();
-  ladeProjekte();
+// ── PROJEKT SICHERSTELLEN (Rückkopplung: neue Projekte automatisch ergänzen) ──
+function sicherstelleProjekt(projektName, erfasstVon) {
+  const name = (projektName || "").toString().trim();
+  if (!name) return;
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(PROJEKTE_TAB);
+  if (!sheet) return;
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow >= 2) {
+    const namen = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    const existiert = namen.some(r => r[0] && r[0].toString().trim().toLowerCase() === name.toLowerCase());
+    if (existiert) return;
+  }
+
+  sheet.appendRow([name, "aktiv", new Date(), erfasstVon || ""]);
 }
 
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').then(reg => {
-    reg.addEventListener('updatefound', () => {
-      const newWorker = reg.installing;
-      newWorker.addEventListener('statechange', () => {
-        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          const t = document.getElementById('toast');
-          t.textContent = '🔄 Update verfügbar – tippe zum Aktualisieren';
-          t.classList.add('show');
-          t.style.cursor = 'pointer';
-          t.onclick = () => {
-            newWorker.postMessage({ action: 'skipWaiting' });
-            t.classList.remove('show');
-            t.style.cursor = '';
-            t.onclick = null;
-          };
-        }
-      });
+// ── BELEG-FOTO IN GOOGLE DRIVE SPEICHERN ──────────────────────────────────────
+// Erwartet einen Data-URL-String ("data:image/jpeg;base64,...."), speichert das
+// Bild als Datei in einem Drive-Ordner und gibt den Freigabe-Link zurück.
+function speichereBeleg(base64DataUrl, dateiName) {
+  const match = base64DataUrl.match(/^data:(image\/[a-zA-Z]+);base64,(.+)$/);
+  if (!match) return null;
+
+  const mimeType = match[1];
+  const bytes = Utilities.base64Decode(match[2]);
+  const blob = Utilities.newBlob(bytes, mimeType, dateiName);
+
+  const ordner = DriveApp.getFoldersByName(BELEGE_ORDNER);
+  const folder = ordner.hasNext() ? ordner.next() : DriveApp.createFolder(BELEGE_ORDNER);
+
+  const file = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return file.getUrl();
+}
+
+// ── FAHRTEN-ARRAY → LESBARER TEXT (mehrzeilig in einer Zelle) ────────────────
+function formatFahrten(fahrten) {
+  if (!fahrten || !fahrten.length) return "";
+  return fahrten
+    .map(f => [f.datum, f.fahrzeug, f.ziel].filter(Boolean).join(" | "))
+    .join("\n");
+}
+
+// ── BAUSTELLENBERICHT SPEICHERN (neue Zeile anhängen) ─────────────────────────
+function verarbeiteBaustellenbericht(data) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(BAUSTELLENBERICHTE_TAB);
+  if (!sheet) {
+    throw new Error(
+      "Tab '" + BAUSTELLENBERICHTE_TAB + "' nicht gefunden – bitte zuerst baustellenberichtSetupEinmalig() ausführen."
+    );
+  }
+
+  const g = data.gruppen || {};
+  const g1 = g.g1 || {}, g2 = g.g2 || {}, g3 = g.g3 || {}, g4 = g.g4 || {}, g5 = g.g5 || {};
+
+  // Fotos hochladen (falls vorhanden) – Reihenfolge bleibt erhalten
+  let fotoLinks = [];
+  if (data.fotos && data.fotos.length) {
+    data.fotos.forEach((foto, i) => {
+      const dateiName = "Beleg_" + (data.projekt || "unbekannt") + "_" + data.date + "_" + (i + 1) + ".jpg";
+      const url = speichereBeleg(foto, dateiName);
+      if (url) fotoLinks.push(url);
     });
+  }
+
+  const zeile = sheet.getLastRow() + 1;
+  sheet.getRange(zeile, COL_BB_DATUM).setValue(data.date || "");
+  sheet.getRange(zeile, COL_BB_PROJEKT).setValue(data.projekt || "");
+  sheet.getRange(zeile, COL_BB_ERFASSTVON).setValue(data.erfasstVon || "");
+  sheet.getRange(zeile, COL_BB_ZEITSTEMPEL).setValue(new Date());
+  sheet.getRange(zeile, COL_BB_G1_STD).setValue(g1.stunden || "");
+  sheet.getRange(zeile, COL_BB_G1_WAS).setValue(g1.was || "");
+  sheet.getRange(zeile, COL_BB_G2_STD).setValue(g2.stunden || "");
+  sheet.getRange(zeile, COL_BB_G2_WAS).setValue(g2.was || "");
+  sheet.getRange(zeile, COL_BB_G3_STD).setValue(g3.stunden || "");
+  sheet.getRange(zeile, COL_BB_G3_WAS).setValue(g3.was || "");
+  sheet.getRange(zeile, COL_BB_G4_STD).setValue(g4.stunden || "");
+  sheet.getRange(zeile, COL_BB_G4_WAS).setValue(g4.was || "");
+  sheet.getRange(zeile, COL_BB_G5_STD).setValue(g5.stunden || "");
+  sheet.getRange(zeile, COL_BB_G5_WAS).setValue(g5.was || "");
+  sheet.getRange(zeile, COL_BB_FAHRTEN).setValue(formatFahrten(data.fahrten));
+  sheet.getRange(zeile, COL_BB_BELEGE).setValue(data.belege || "");
+  sheet.getRange(zeile, COL_BB_FOTOS).setValue(fotoLinks.join("\n"));
+  sheet.getRange(zeile, COL_BB_NOTIZEN).setValue(data.notizen || "");
+
+  // Rückkopplung: neues Projekt automatisch in die Liste aufnehmen
+  sicherstelleProjekt(data.projekt, data.erfasstVon);
+
+  return "✅ Baustellenbericht gespeichert: " + (data.projekt || "") + " " + (data.date || "");
+}
+
+// ============================================================
+// EINMALIGES SETUP – im Skript-Editor manuell einmal ausführen
+// ============================================================
+function baustellenberichtSetupEinmalig() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  let bb = ss.getSheetByName(BAUSTELLENBERICHTE_TAB);
+  if (!bb) bb = ss.insertSheet(BAUSTELLENBERICHTE_TAB);
+  const bbHeader = [
+    "Datum", "Projekt", "Erfasst von", "Zeitstempel",
+    "Gruppe1 Std", "Gruppe1 Was",
+    "Gruppe2 Std", "Gruppe2 Was",
+    "Gruppe3 Std", "Gruppe3 Was",
+    "Gruppe4 Std (Bagger)", "Gruppe4 Was",
+    "Gruppe5 Std (Weitere)", "Gruppe5 Was",
+    "Fahrten", "Belege (Anzahl/Was)", "Foto-Links", "Bemerkungen"
+  ];
+  bb.getRange(1, 1, 1, bbHeader.length).setValues([bbHeader]).setFontWeight("bold");
+  bb.setFrozenRows(1);
+
+  let pr = ss.getSheetByName(PROJEKTE_TAB);
+  if (!pr) pr = ss.insertSheet(PROJEKTE_TAB);
+  const prHeader = ["Projektname", "Status", "Hinzugefügt am", "Hinzugefügt von"];
+  pr.getRange(1, 1, 1, prHeader.length).setValues([prHeader]).setFontWeight("bold");
+  pr.setFrozenRows(1);
+
+  Logger.log("✅ Tabs 'Baustellenberichte' und 'Projekte' angelegt/geprüft.");
+}
+
+// ── TEST ──────────────────────────────────────────────────────────────────────
+function testBaustellenbericht() {
+  const testDaten = {
+    type: "baustellenbericht",
+    date: "2026-07-19",
+    projekt: "Kunde Müller",
+    erfasstVon: "Marcel Rollus",
+    gruppen: {
+      g2: { stunden: 0.5, was: "Puster" },
+      g3: { stunden: 2.5, was: "Heckenschere, Motorsäge" },
+      g4: { stunden: 7, was: "Gelb Klaas" },
+      g5: { stunden: 4, was: "Häcksler" }
+    },
+    fahrten: [
+      { datum: "2025-10-02", fahrzeug: "Sprinter", ziel: "Entsorgung GESA" },
+      { datum: "2025-10-06", fahrzeug: "Sprinter", ziel: "Entsorgung GESA" }
+    ],
+    belege: "2x Lieferschein GESA",
+    fotos: [],
+    notizen: "8m³ Grünschnitt entsorgt"
+  };
+  Logger.log(verarbeiteBaustellenbericht(testDaten));
+}
+
+// ── TEST: Token-Auflösung ─────────────────────────────────────────────────────
+function testTokenAufloesung() {
+  // Vorher generateTokensEinmalig() ausgeführt haben, dann hier einen echten
+  // Token aus Spalte C der ⚙️ Einstellungen eintragen, um zu prüfen:
+  const testToken = "HIER_ECHTEN_TOKEN_EINSETZEN";
+  Logger.log(getNameByToken(testToken));
+}
+
+// ============================================================
+// LEISTUNGSERFASSUNG – Konfiguration (NEU)
+// ============================================================
+const LEISTUNG_TAB = "Leistungserfassung";
+const LEISTUNG_TOKEN_PROPERTY = "LEISTUNG_TOKEN";
+
+const COL_LE_ID          = 1; // A
+const COL_LE_DATUM       = 2; // B
+const COL_LE_MITARBEITER = 3; // C
+const COL_LE_KATEGORIE   = 4; // D
+const COL_LE_PROJEKT     = 5; // E
+const COL_LE_START       = 6; // F
+const COL_LE_ENDE        = 7; // G
+const COL_LE_DAUER       = 8; // H
+const COL_LE_ZEITSTEMPEL = 9; // I
+
+// ── GEMEINSAMER TOKEN (ein Token für alle, anders als bei Zeiterfassung) ─────
+function pruefeLeistungToken_(token) {
+  const gespeichert = PropertiesService.getScriptProperties().getProperty(LEISTUNG_TOKEN_PROPERTY);
+  return !!gespeichert && !!token && token.toString().trim() === gespeichert;
+}
+
+// Einmalig ausführen (und erneut bei Bedarf, z.B. wenn ein Mitarbeiter geht):
+function rotateLeistungTokenEinmalig() {
+  const neuerToken = Utilities.getUuid().replace(/-/g, '').substring(0, 16);
+  PropertiesService.getScriptProperties().setProperty(LEISTUNG_TOKEN_PROPERTY, neuerToken);
+  const baseUrl = "https://dddpp.github.io/Zeiterfassung/leistungserfassung.html";
+  Logger.log("✅ Neuer Leistungserfassung-Link: " + baseUrl + "?token=" + neuerToken);
+}
+
+// ── VERARBEITUNG ───────────────────────────────────────────────────────────
+function verarbeiteLeistung(data) {
+  if (!pruefeLeistungToken_(data.token)) throw new Error("Ungültiger Zugang (Token)");
+
+  if (data.type === "leistung_start") {
+    const id = starteRunde_(data.mitarbeiter, data.kategorie, data.projekt, data.startZeit, data.id);
+    return { aktion: "gestartet", id: id };
+  }
+  if (data.type === "leistung_stop") {
+    beendeRunde_(data.id, data.endZeit);
+    return { aktion: "gestoppt", id: data.id };
+  }
+  if (data.type === "leistung_wechsel") {
+    beendeRunde_(data.id, data.endZeit);
+    const neueId = starteRunde_(data.mitarbeiter, data.neue.kategorie, data.neue.projekt, data.neue.startZeit, data.neue.id);
+    return { aktion: "gewechselt", id: neueId };
+  }
+  if (data.type === "leistung_update") {
+    aktualisiereRunde_(data.id, data.kategorie, data.projekt, data.startZeit, data.endZeit);
+    return { aktion: "aktualisiert", id: data.id };
+  }
+  if (data.type === "leistung_delete") {
+    loescheRunde_(data.id);
+    return { aktion: "geloescht", id: data.id };
+  }
+  throw new Error("Unbekannter Leistungs-Typ: " + data.type);
+}
+
+function starteRunde_(mitarbeiter, kategorie, projekt, startZeit, clientId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(LEISTUNG_TAB);
+  if (!sheet) throw new Error("Tab '" + LEISTUNG_TAB + "' nicht gefunden – bitte leistungSetupEinmalig() ausführen.");
+
+  const id = (clientId && clientId.toString().trim()) || Utilities.getUuid();
+  const start = new Date(startZeit);
+  // Deutsches Format (dd.MM.yyyy), konsistent mit den Mitarbeiter-Tabs
+  const datum = Utilities.formatDate(start, Session.getScriptTimeZone(), "dd.MM.yyyy");
+
+  const zeile = sheet.getLastRow() + 1;
+  sheet.getRange(zeile, COL_LE_ID).setValue(id);
+  sheet.getRange(zeile, COL_LE_DATUM).setValue(datum);
+  sheet.getRange(zeile, COL_LE_MITARBEITER).setValue(mitarbeiter || "");
+  sheet.getRange(zeile, COL_LE_KATEGORIE).setValue(kategorie || "");
+  sheet.getRange(zeile, COL_LE_PROJEKT).setValue(projekt || "");
+  sheet.getRange(zeile, COL_LE_START).setValue(start).setNumberFormat("dd.mm.yyyy hh:mm:ss");
+  sheet.getRange(zeile, COL_LE_ZEITSTEMPEL).setValue(new Date()).setNumberFormat("dd.mm.yyyy hh:mm:ss");
+
+  return id;
+}
+
+function beendeRunde_(id, endZeit) {
+  if (!id) throw new Error("Keine ID für Rundenende übergeben.");
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(LEISTUNG_TAB);
+  if (!sheet) throw new Error("Tab '" + LEISTUNG_TAB + "' nicht gefunden.");
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) throw new Error("Runde nicht gefunden: " + id);
+
+  const ids = sheet.getRange(2, COL_LE_ID, lastRow - 1, 1).getValues();
+  let zeile = null;
+  for (let i = 0; i < ids.length; i++) {
+    if (ids[i][0] && ids[i][0].toString() === id.toString()) { zeile = i + 2; break; }
+  }
+  if (!zeile) throw new Error("Runde nicht gefunden: " + id);
+
+  const start = sheet.getRange(zeile, COL_LE_START).getValue();
+  const ende = new Date(endZeit);
+  const dauerMin = Math.round((ende.getTime() - new Date(start).getTime()) / 60000);
+
+  sheet.getRange(zeile, COL_LE_ENDE).setValue(ende).setNumberFormat("dd.mm.yyyy hh:mm:ss");
+  sheet.getRange(zeile, COL_LE_DAUER).setValue(dauerMin);
+}
+
+function findeOffeneRunde_(mitarbeiter) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(LEISTUNG_TAB);
+  if (!sheet) return null;
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return null;
+
+  const werte = sheet.getRange(2, COL_LE_ID, lastRow - 1, COL_LE_ENDE - COL_LE_ID + 1).getValues();
+  for (let i = werte.length - 1; i >= 0; i--) {
+    const row = werte[i];
+    if (row[2] === mitarbeiter && !row[6]) {
+      return { id: row[0], kategorie: row[3], projekt: row[4], start: row[5] };
+    }
+  }
+  return null;
+}
+
+// ── ABGESCHLOSSENE RUNDEN DES HEUTIGEN TAGES (für die Übersicht im Frontend) ──
+function findeRundenHeute_(mitarbeiter) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(LEISTUNG_TAB);
+  if (!sheet) return [];
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+
+  const heute = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd.MM.yyyy");
+  const breite = COL_LE_DAUER - COL_LE_ID + 1;
+  const werte = sheet.getRange(2, COL_LE_ID, lastRow - 1, breite).getValues();
+  // Spalten innerhalb der Range (0-basiert): 0=ID,1=Datum,2=Mitarbeiter,3=Kategorie,4=Projekt,5=Start,6=Ende,7=Dauer
+
+  const runden = [];
+  werte.forEach(row => {
+    const passtDatum = row[1] === heute;
+    const passtMA = row[2] === mitarbeiter;
+    const istAbgeschlossen = !!row[6]; // nur fertige Runden, die laufende zeigt der Timer bereits an
+    if (passtDatum && passtMA && istAbgeschlossen) {
+      runden.push({
+        id: row[0],
+        kategorie: row[3],
+        projekt: row[4],
+        start: row[5],
+        ende: row[6],
+        dauerMin: row[7]
+      });
+    }
   });
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    window.location.reload();
+  return runden;
+}
+
+// ── RUNDE NACHTRÄGLICH BEARBEITEN ─────────────────────────────────────────────
+function aktualisiereRunde_(id, kategorie, projekt, startZeit, endZeit) {
+  if (!id) throw new Error("Keine ID für Aktualisierung übergeben.");
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(LEISTUNG_TAB);
+  if (!sheet) throw new Error("Tab '" + LEISTUNG_TAB + "' nicht gefunden.");
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) throw new Error("Runde nicht gefunden: " + id);
+
+  const ids = sheet.getRange(2, COL_LE_ID, lastRow - 1, 1).getValues();
+  let zeile = null;
+  for (let i = 0; i < ids.length; i++) {
+    if (ids[i][0] && ids[i][0].toString() === id.toString()) { zeile = i + 2; break; }
+  }
+  if (!zeile) throw new Error("Runde nicht gefunden: " + id);
+
+  const start = new Date(startZeit);
+  const ende = new Date(endZeit);
+  const dauerMin = Math.round((ende.getTime() - start.getTime()) / 60000);
+  const datum = Utilities.formatDate(start, Session.getScriptTimeZone(), "dd.MM.yyyy");
+
+  sheet.getRange(zeile, COL_LE_DATUM).setValue(datum);
+  sheet.getRange(zeile, COL_LE_KATEGORIE).setValue(kategorie || "");
+  sheet.getRange(zeile, COL_LE_PROJEKT).setValue(projekt || "");
+  sheet.getRange(zeile, COL_LE_START).setValue(start).setNumberFormat("dd.mm.yyyy hh:mm:ss");
+  sheet.getRange(zeile, COL_LE_ENDE).setValue(ende).setNumberFormat("dd.mm.yyyy hh:mm:ss");
+  sheet.getRange(zeile, COL_LE_DAUER).setValue(dauerMin);
+}
+
+// ── RUNDE LÖSCHEN ──────────────────────────────────────────────────────────────
+function loescheRunde_(id) {
+  if (!id) throw new Error("Keine ID zum Löschen übergeben.");
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(LEISTUNG_TAB);
+  if (!sheet) throw new Error("Tab '" + LEISTUNG_TAB + "' nicht gefunden.");
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) throw new Error("Runde nicht gefunden: " + id);
+
+  const ids = sheet.getRange(2, COL_LE_ID, lastRow - 1, 1).getValues();
+  for (let i = 0; i < ids.length; i++) {
+    if (ids[i][0] && ids[i][0].toString() === id.toString()) {
+      sheet.deleteRow(i + 2);
+      return;
+    }
+  }
+  throw new Error("Runde nicht gefunden: " + id);
+}
+
+// ── EINMALIGES SETUP ──────────────────────────────────────────────────────
+function leistungSetupEinmalig() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let le = ss.getSheetByName(LEISTUNG_TAB);
+  if (!le) le = ss.insertSheet(LEISTUNG_TAB);
+  const header = ["ID", "Datum", "Mitarbeiter", "Kategorie", "Projekt", "Start", "Ende", "Dauer (Min)", "Zeitstempel"];
+  le.getRange(1, 1, 1, header.length).setValues([header]).setFontWeight("bold");
+  le.setFrozenRows(1);
+  Logger.log("✅ Tab 'Leistungserfassung' angelegt/geprüft.");
+}
+
+/**
+ * WOCHENREPORT – Garten Hoch 3 (v2, korrigiert nach echter Sheet-Struktur)
+ * Sendet jeden Sonntag eine Mail mit Wochenübersicht + Warnhinweisen.
+ *
+ * SETUP (einmalig im Apps Script Editor):
+ * Uhr-Symbol links ("Trigger") -> Trigger hinzufügen
+ * -> Funktion: sendWeeklyReport
+ * -> Ereignisquelle: Zeitgesteuert -> Wochentimer -> Sonntag -> 9-10 Uhr
+ */
+
+// ==== KONFIGURATION ====
+const REPORT_RECIPIENTS = ['gartenhoch3@gmail.com'];
+// TODO: falls Chef & Bürokraft unterschiedliche Adressen bekommen sollen,
+// hier einfach als weitere Einträge ins Array ergänzen.
+
+const EINSTELLUNGEN_TAB = '⚙️ Einstellungen';
+const BAUSTELLENBERICHT_TAB = 'Baustellenberichte';
+
+// TODO: falls Testperson1/2 doch mit in den Report sollen, diese Zeile löschen/anpassen
+const TESTNUTZER_MUSTER = /^Testperson/i;
+
+// Tagesbuchungen liegen fest in Zeile 56-1151 (ca. 3 Jahre ab 01.01.2026) –
+// exakt der Bereich, auf den auch die Monats-SUMPRODUCT-Formeln verweisen.
+const TAGESDATEN_START_ROW = 56;
+const TAGESDATEN_END_ROW = 1151;
+
+// Spalten-Indizes (0-basiert) innerhalb des Bereichs A:Q
+const SPALTEN = {
+  DATUM: 0,        // A
+  TYP: 2,          // C  -> 'Arbeitstag' | 'Urlaub' | 'Krank' | 'Feiertag' | 'Wochenende' | ''
+  PAUSE1: 5,       // F
+  ARBEITSZEIT: 6,  // G
+  PAUSE2: 11,      // L
+  PAUSE3: 15       // P
+};
+
+// ==== HAUPTFUNKTION ====
+function sendWeeklyReport() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const { montag, sonntag } = getWeekRange_();
+  const mitarbeiterNamen = getAktiveMitarbeiter_(ss);
+
+  const mitarbeiterDaten = mitarbeiterNamen.map(name => {
+    const sheet = ss.getSheetByName(name);
+    if (!sheet) return { name, fehler: 'Tab nicht gefunden' };
+    return collectMitarbeiterWoche_(sheet, name, montag, sonntag);
+  });
+
+  const baustellenDaten = collectBaustellenberichte_(ss, montag, sonntag);
+  const html = buildReportHtml_(mitarbeiterDaten, baustellenDaten, montag, sonntag);
+
+  MailApp.sendEmail({
+    to: REPORT_RECIPIENTS.join(','),
+    subject: `Wochenreport KW ${getKW_(montag)} – Garten Hoch 3`,
+    htmlBody: html
   });
 }
-</script>
-</body>
-</html>
+
+// ==== AKTIVE MITARBEITER AUS ⚙️ EINSTELLUNGEN LESEN ====
+function getAktiveMitarbeiter_(ss) {
+  const sheet = ss.getSheetByName(EINSTELLUNGEN_TAB);
+  if (!sheet) return [];
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+
+  const rows = sheet.getRange(2, 1, lastRow - 1, 2).getDisplayValues();
+  return rows
+    .filter(r => (r[1] || '').toString().trim().toLowerCase() === 'aktiv')
+    .map(r => (r[0] || '').toString().trim())
+    .filter(name => name && !TESTNUTZER_MUSTER.test(name));
+}
+
+// ==== ZEITRAUM: MONTAG–SONNTAG DER AKTUELLEN WOCHE ====
+function getWeekRange_() {
+  const heute = new Date();
+  const dow = heute.getDay(); // 0=So, 1=Mo, ..., 6=Sa
+  const diffZuMontag = dow === 0 ? -6 : 1 - dow;
+
+  const montag = new Date(heute);
+  montag.setDate(heute.getDate() + diffZuMontag);
+  montag.setHours(0, 0, 0, 0);
+
+  const sonntag = new Date(montag);
+  sonntag.setDate(montag.getDate() + 6);
+  sonntag.setHours(23, 59, 59, 999);
+
+  return { montag, sonntag };
+}
+
+// ==== DATUM AUS DISPLAYVALUE PARSEN (GMT-sicher, siehe Learning #1) ====
+// Erkennt sowohl dd.mm.yyyy (Mitarbeiter-Tabs) als auch yyyy-mm-dd (Baustellenberichte)
+function parseDisplayDate_(displayValue) {
+  if (!displayValue) return null;
+  const val = displayValue.toString().trim();
+
+  if (val.includes('.')) {
+    const [tag, monat, jahr] = val.split('.').map(Number);
+    if (!tag || !monat || !jahr) return null;
+    return new Date(jahr, monat - 1, tag);
+  }
+  if (val.includes('-')) {
+    const [jahr, monat, tag] = val.split(' ')[0].split('-').map(Number);
+    if (!tag || !monat || !jahr) return null;
+    return new Date(jahr, monat - 1, tag);
+  }
+  return null;
+}
+
+function istInWoche_(datum, montag, sonntag) {
+  return !!datum && datum >= montag && datum <= sonntag;
+}
+
+// ==== PRO MITARBEITER: WOCHENDATEN SAMMELN ====
+function collectMitarbeiterWoche_(sheet, name, montag, sonntag) {
+  const numRows = TAGESDATEN_END_ROW - TAGESDATEN_START_ROW + 1;
+  const displayValues = sheet.getRange(TAGESDATEN_START_ROW, 1, numRows, 17).getDisplayValues();
+
+  let nettoStundenWoche = 0;
+  let tageArbeit = 0;
+  let tageUrlaubKrank = 0;
+  const fehlendeTage = [];
+  const warnungenUeber10h = [];
+  const warnungenPause = [];
+
+  displayValues.forEach(row => {
+    const datum = parseDisplayDate_(row[SPALTEN.DATUM]);
+    if (!istInWoche_(datum, montag, sonntag)) return;
+
+    const typ = (row[SPALTEN.TYP] || '').toString().trim();
+    const datumStr = Utilities.formatDate(datum, Session.getScriptTimeZone(), 'dd.MM.');
+
+    // Feiertag/Wochenende sind Vorbelegungen ohne Buchungspflicht -> nicht werten,
+    // AUSSER sie wurden durch eine tatsächliche Buchung überschrieben (z.B. Sonntagsarbeit,
+    // dann steht dort 'Arbeitstag' statt 'Wochenende').
+    if (typ === 'Feiertag' || typ === 'Wochenende') return;
+
+    if (!typ) {
+      fehlendeTage.push(`${name} – ${datumStr}`);
+      return;
+    }
+
+    if (typ === 'Urlaub' || typ === 'Krank') {
+      tageUrlaubKrank++;
+      return;
+    }
+
+    if (typ !== 'Arbeitstag') return; // unbekannter Typ-Wert, TODO ggf. ergänzen
+
+    tageArbeit++;
+    const arbeitszeit = parseFloat((row[SPALTEN.ARBEITSZEIT] || '0').toString().replace(',', '.')) || 0;
+    nettoStundenWoche += arbeitszeit;
+
+    if (arbeitszeit > 10) {
+      warnungenUeber10h.push(`${name} – ${datumStr} (${arbeitszeit.toFixed(2)}h)`);
+    }
+
+    const pauseGesamt = ['PAUSE1', 'PAUSE2', 'PAUSE3'].reduce((sum, key) => {
+      const val = parseFloat((row[SPALTEN[key]] || '0').toString().replace(',', '.')) || 0;
+      return sum + val;
+    }, 0);
+
+    if (arbeitszeit >= 9 && pauseGesamt < 45) {
+      warnungenPause.push(`${name} – ${datumStr} (${arbeitszeit.toFixed(2)}h, Pause ${pauseGesamt}min)`);
+    } else if (arbeitszeit >= 6 && arbeitszeit < 9 && pauseGesamt < 30) {
+      warnungenPause.push(`${name} – ${datumStr} (${arbeitszeit.toFixed(2)}h, Pause ${pauseGesamt}min)`);
+    }
+  });
+
+  return {
+    name,
+    nettoStundenWoche,
+    tageArbeit,
+    tageUrlaubKrank,
+    fehlendeTage,
+    warnungenUeber10h,
+    warnungenPause
+  };
+}
+
+// ==== BAUSTELLENBERICHTE DER WOCHE ====
+function collectBaustellenberichte_(ss, montag, sonntag) {
+  const sheet = ss.getSheetByName(BAUSTELLENBERICHT_TAB);
+  if (!sheet) return [];
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+
+  // A=Datum, B=Projekt, C=Erfasst von
+  const displayValues = sheet.getRange(2, 1, lastRow - 1, 3).getDisplayValues();
+
+  return displayValues
+    .map(row => ({
+      datum: parseDisplayDate_(row[0]),
+      projekt: row[1],
+      mitarbeiter: row[2]
+    }))
+    .filter(eintrag => istInWoche_(eintrag.datum, montag, sonntag));
+}
+
+// ==== ISO-KALENDERWOCHE ====
+function getKW_(datum) {
+  const d = new Date(Date.UTC(datum.getFullYear(), datum.getMonth(), datum.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+
+// ==== HTML-MAIL BAUEN ====
+function buildReportHtml_(mitarbeiterDaten, baustellenDaten, montag, sonntag) {
+  const fmt = d => Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd.MM.yyyy');
+
+  let html = `<h2>Wochenreport ${fmt(montag)} – ${fmt(sonntag)}</h2>`;
+
+  html += '<h3>Übersicht Arbeitszeiten</h3><table border="1" cellpadding="5" style="border-collapse:collapse">';
+  html += '<tr><th>Mitarbeiter</th><th>Netto-Std.</th><th>Arbeitstage</th><th>Urlaub/Krank</th></tr>';
+  mitarbeiterDaten.forEach(ma => {
+    if (ma.fehler) {
+      html += `<tr><td>${ma.name}</td><td colspan="3">${ma.fehler}</td></tr>`;
+      return;
+    }
+    html += `<tr><td>${ma.name}</td><td>${ma.nettoStundenWoche.toFixed(2)}</td><td>${ma.tageArbeit}</td><td>${ma.tageUrlaubKrank}</td></tr>`;
+  });
+  html += '</table>';
+
+  const alleFehlendenTage = mitarbeiterDaten.flatMap(ma => ma.fehlendeTage || []);
+  const alleUeber10h = mitarbeiterDaten.flatMap(ma => ma.warnungenUeber10h || []);
+  const allePause = mitarbeiterDaten.flatMap(ma => ma.warnungenPause || []);
+
+  html += '<h3>Warnhinweise</h3>';
+  if (alleFehlendenTage.length === 0 && alleUeber10h.length === 0 && allePause.length === 0) {
+    html += '<p>Keine Auffälligkeiten diese Woche.</p>';
+  } else {
+    if (alleFehlendenTage.length) {
+      html += `<p><b>Fehlende Buchung (kein Arbeitstag/Urlaub/Krank eingetragen):</b><br>${alleFehlendenTage.join('<br>')}</p>`;
+    }
+    if (alleUeber10h.length) {
+      html += `<p><b>Über 10h an einem Tag:</b><br>${alleUeber10h.join('<br>')}</p>`;
+    }
+    if (allePause.length) {
+      html += `<p><b>Gesetzliche Pause evtl. nicht eingehalten:</b><br>${allePause.join('<br>')}</p>`;
+    }
+  }
+
+  html += '<h3>Baustellenberichte diese Woche</h3>';
+  if (baustellenDaten.length === 0) {
+    html += '<p>Keine Baustellenberichte erfasst.</p>';
+  } else {
+    html += '<table border="1" cellpadding="5" style="border-collapse:collapse">';
+    html += '<tr><th>Datum</th><th>Mitarbeiter</th><th>Projekt</th></tr>';
+    baustellenDaten.forEach(b => {
+      html += `<tr><td>${fmt(b.datum)}</td><td>${b.mitarbeiter}</td><td>${b.projekt}</td></tr>`;
+    });
+    html += '</table>';
+  }
+
+  return html;
+}
