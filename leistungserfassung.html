@@ -48,13 +48,20 @@
   .submit-wrap{padding:4px 0 8px}
   .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#111;color:#fff;padding:11px 18px;border-radius:999px;font-size:13px;font-weight:500;z-index:200;transition:transform .3s ease;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}
   .toast.show{transform:translateX(-50%) translateY(0)}
+  .runde-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)}
+  .runde-row:last-child{border-bottom:none}
+  .runde-info{font-size:13px;font-weight:600}
+  .runde-projekt{font-size:12px;color:var(--muted);margin-top:1px}
+  .runde-zeit{font-size:12px;color:var(--muted);text-align:right;white-space:nowrap;margin-left:10px}
+  .runde-dauer{font-size:13px;font-weight:700;text-align:right}
+  .heute-empty{font-size:12px;color:var(--muted);padding:2px 0}
 </style>
 </head>
 <body>
 
 <div class="header">
   <div class="header-top">
-    <div class="logo"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAATUAAABQCAYAAAB4UeJZAABO7UlEQVR42u19d3hd1ZX22ufce19XtVzoPYkNBLBwt5FIIIFAhklGCpkwZEhmTBIg4Aqk8PRS6aaEOplk0n4zkdImBYKBSOAq+cmU2CaYQIyNcZGs9uot5+zfH/ddWzYusjEQmLe/z5/5hPzKueesvffaa+8DlK1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZ/q5BjRlEBGZOiuWdmS8ahjHPsozjozETIKBYcFHIOXOmTLr9riCaKwNbucpWtrK9o0YRicSRhTLmZI5r7JuZ5xL5+aJhGPMsyzg+GjMBAooFF4WcM2fKpNvvCqK5MrCVrWxle6ct4vd7DQ0TmJl9v9CVqfyDwOFYFm6SdD1UPVE33qTdVU4qq9laVsZftHmWEY8yzLOD4aMwECigUXhZwzZ8qk2+8KormyvWXzeQz4/T7DMMYwsxJC3NIC3f4bAfx3AB8H8OU+VOGDe3sDrq0K7Kga5sQOgeAgOJ2GfjxRPzsjYtwF4CQiKgRs69bVwzhK6R0AZpe6uKgy8m8u+PoTfWfNqzknKlv+ZeMe0BGRQEyMcqAAAAAElFTkSuQmCC" alt="Garten Hoch 3"></div>
+    <div class="logo"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAATUAAABQCAYAAAB4UeJZAABO7UlEQVR42u19d3hd1ZX22ufce19XtVzoPYkNBLBwt5FIIIFAhklGCpkwZEhmTBIg4Aqk8PRS6aaEOplk0n4zkdImBYKBSOAq+cmU2CaYQIyNcZGs9uot5+zfH/ddWzYusjEQmLe/z5/5hPzKueesvffaa+8DlK1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2f6uQY0ZRARmTorlnZkvGoYxz7KM46MxEyCgWHBRyDlzpky6/a4gmisDW7nKVrayvaNGEYnEkYUy5mSOa+ybmecS+fmiYRjzLMs4PhozAQKKBReFnDNnyqTb7wqiuTKwlatsZXunLeL3ew0NE5iZfb/QlanRgLBIeTfeVMHgYAAJIyMDW7nKVra3+//jY1JLzQVoAAAAAElFTkSuQmCC" alt="Garten Hoch 3"></div>
   </div>
   <div class="header-title">⏱️ Leistungserfassung</div>
 </div>
@@ -104,6 +111,12 @@
     </div>
   </div>
 
+  <!-- BISHERIGE RUNDEN HEUTE -->
+  <div class="form-card" id="heuteCard" style="display:none">
+    <div class="card-title">📋 Bisherige Runden heute</div>
+    <div id="heuteListe"></div>
+  </div>
+
 </div><!-- /main -->
 
 <div class="toast" id="toast"></div>
@@ -118,12 +131,11 @@ const KATEGORIEN = [
 ];
 
 let aktuellerMA = '';
-let aktuelleRunde = null;   // { id, mitarbeiter, kategorie, projekt, start (ISO-String) }
+let aktuelleRunde = null;
 let timerInterval = null;
 let ausgewaehlteKategorie = null;
-let auswahlModus = 'start'; // 'start' oder 'wechsel'
+let auswahlModus = 'start';
 
-// ── TOAST ──────────────────────────────────────────────────────────────────────
 let toastT;
 function showToast(msg){
   const t=document.getElementById('toast');
@@ -131,7 +143,6 @@ function showToast(msg){
   clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2800);
 }
 
-// ── LOKALE RUNDE (Wiederherstellung bei App-Neustart) ──────────────────────────
 function ladeLokaleRunde(){
   try{ const raw = localStorage.getItem('gh3_le_runde'); return raw ? JSON.parse(raw) : null; }
   catch(e){ return null; }
@@ -146,7 +157,6 @@ function neueId(){
   return (crypto.randomUUID) ? crypto.randomUUID() : ('id-' + Date.now() + '-' + Math.random().toString(16).slice(2));
 }
 
-// ── MITARBEITER LADEN ──────────────────────────────────────────────────────────
 async function ladeMitarbeiter(){
   try{
     const res = await fetch(WEBHOOK_BASE + '?action=leistung_mitarbeiter&token=' + encodeURIComponent(TOKEN));
@@ -162,6 +172,7 @@ async function ladeMitarbeiter(){
       document.getElementById('startBtn').disabled = false;
       document.getElementById('startWrap').style.display = '';
       await pruefeAktuelleRunde();
+      await ladeRundenHeute();
     }
   }catch(e){ console.warn('Mitarbeiterliste konnte nicht geladen werden:', e); showToast('⚠️ Verbindung fehlgeschlagen'); }
 }
@@ -175,7 +186,11 @@ document.getElementById('leMa').addEventListener('change', async function(){
   document.getElementById('timerCard').style.display = 'none';
   document.getElementById('auswahlCard').style.display = 'none';
   document.getElementById('startWrap').style.display = aktuellerMA ? '' : 'none';
-  if(aktuellerMA) await pruefeAktuelleRunde();
+  document.getElementById('heuteCard').style.display = 'none';
+  if(aktuellerMA){
+    await pruefeAktuelleRunde();
+    await ladeRundenHeute();
+  }
 });
 
 async function pruefeAktuelleRunde(){
@@ -196,7 +211,6 @@ async function pruefeAktuelleRunde(){
   }catch(e){ console.warn('Konnte offene Runde nicht prüfen:', e); }
 }
 
-// ── PROJEKTE LADEN ─────────────────────────────────────────────────────────────
 async function ladeProjekte(){
   try{
     const res = await fetch(WEBHOOK_BASE + '?action=projekte');
@@ -211,7 +225,39 @@ document.getElementById('leProjekt').addEventListener('change', function(){
   document.getElementById('leProjektNeu').style.display = this.value === '__new__' ? '' : 'none';
 });
 
-// ── KATEGORIE-CHIPS ─────────────────────────────────────────────────────────────
+async function ladeRundenHeute(){
+  if(!aktuellerMA) return;
+  try{
+    const res = await fetch(WEBHOOK_BASE + '?action=leistung_heute&mitarbeiter=' + encodeURIComponent(aktuellerMA) + '&token=' + encodeURIComponent(TOKEN));
+    const data = await res.json();
+    if(data.status === 'ok'){ renderRundenHeute(data.runden || []); }
+  }catch(e){ console.warn('Tagesübersicht konnte nicht geladen werden:', e); }
+}
+
+function formatUhrzeit(iso){
+  const d = new Date(iso);
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+
+function renderRundenHeute(runden){
+  const card = document.getElementById('heuteCard');
+  const liste = document.getElementById('heuteListe');
+  if(!runden.length){ card.style.display = 'none'; return; }
+  card.style.display = '';
+  liste.innerHTML = runden.map(r => `
+    <div class="runde-row">
+      <div>
+        <div class="runde-info">${r.kategorie}</div>
+        ${r.projekt ? `<div class="runde-projekt">${r.projekt}</div>` : ''}
+      </div>
+      <div>
+        <div class="runde-dauer">${r.dauerMin} Min</div>
+        <div class="runde-zeit">${formatUhrzeit(r.start)}–${formatUhrzeit(r.ende)}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
 function renderKatChips(){
   const c = document.getElementById('katChips');
   c.innerHTML = KATEGORIEN.map(k =>
@@ -224,7 +270,6 @@ function waehleKategorie(k){
   document.getElementById('katSonstigesText').style.display = (k === 'Sonstiges') ? '' : 'none';
 }
 
-// ── AUSWAHL-PANEL (Start ODER Wechsel) ──────────────────────────────────────────
 function zeigeAuswahl(modus){
   auswahlModus = modus;
   ausgewaehlteKategorie = null;
@@ -261,12 +306,13 @@ async function bestaetigeAuswahl(){
     await sendToSheet({ type:'leistung_start', token: TOKEN, id, mitarbeiter: aktuellerMA, kategorie, projekt, startZeit: jetzt });
   } else {
     const alteId = aktuelleRunde.id;
-    await sendToSheet({ type:'leistung_wechsel', token: TOKEN, id: alteId, endZeit: jetzt, neue: { id, kategorie, projekt, startZeit: jetzt } });
+    await sendToSheet({ type:'leistung_wechsel', token: TOKEN, id: alteId, mitarbeiter: aktuellerMA, endZeit: jetzt, neue: { id, kategorie, projekt, startZeit: jetzt } });
     aktuelleRunde = { id, mitarbeiter: aktuellerMA, kategorie, projekt, start: jetzt };
   }
 
   speichereLokaleRunde(aktuelleRunde);
   zeigeTimer();
+  await ladeRundenHeute();
 }
 
 function naechsteRunde(){ zeigeAuswahl('wechsel'); }
@@ -282,9 +328,9 @@ async function rundeFertig(){
   document.getElementById('auswahlCard').style.display = 'none';
   document.getElementById('startWrap').style.display = '';
   showToast('✅ Runde gespeichert');
+  await ladeRundenHeute();
 }
 
-// ── TIMER-ANZEIGE ────────────────────────────────────────────────────────────
 function zeigeTimer(){
   document.getElementById('auswahlCard').style.display = 'none';
   document.getElementById('startWrap').style.display = 'none';
@@ -305,14 +351,12 @@ function updateTimerDisplay(){
   document.getElementById('timerWarnung').style.display = (totalSec > 12*3600) ? '' : 'none';
 }
 
-// ── SENDEN ─────────────────────────────────────────────────────────────────────
 async function sendToSheet(payload){
   try{
     await fetch(WEBHOOK_BASE, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
   }catch(e){ console.warn('Fehler beim Senden:', e); }
 }
 
-// ── INIT ───────────────────────────────────────────────────────────────────────
 if(!TOKEN){
   document.getElementById('tokenError').style.display = '';
 } else {
@@ -320,7 +364,6 @@ if(!TOKEN){
   ladeProjekte();
 }
 
-// ── SERVICE WORKER (Auto-Update) ──────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').then(reg => {
     reg.addEventListener('updatefound', () => {
