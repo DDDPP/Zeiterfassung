@@ -158,12 +158,48 @@ const KATEGORIEN = [
   'Rüstzeit','Fahrzeit','Baustellenzeit','Lagerarbeit','Kundenakquise',
   'Besorgungsfahrt','Entsorgungsfahrt','Maschineninstandhaltung','Sonstiges'
 ];
+const MAX_RUNDE_MS = 12 * 3600 * 1000;   // wie im Backend (LE_MAX_RUNDE_MIN): länger offen = "alte Runde"
 
 let aktuellerMA = '';
 let aktuelleRunde = null;   // { id, mitarbeiter, kategorie, projekt, start (ISO-String) }
 let timerInterval = null;
 let ausgewaehlteKategorie = null;
 let auswahlModus = 'start'; // 'start' oder 'wechsel'
+let busy = false;           // kurze Sperre gegen Doppeltipps
+
+// ── UI-ZUSÄTZE (werden hier per JS ergänzt, damit nur dieser Script-Block ersetzt werden muss) ──
+(function injectUi(){
+  const st = document.createElement('style');
+  st.textContent = `
+    .sync-status{font-size:12px;font-weight:600;color:var(--blue);margin-top:8px}
+    .sync-status.err{color:var(--red)}
+  `;
+  document.head.appendChild(st);
+  document.querySelector('.header').insertAdjacentHTML('beforeend',
+    '<div class="sync-status" id="syncStatus" style="display:none"></div>');
+  document.getElementById('timerCard').insertAdjacentHTML('afterend', `
+    <div class="form-card" id="staleCard" style="display:none;border-color:var(--orange)">
+      <div class="card-title" style="color:var(--orange)">⚠️ Alte Runde noch offen</div>
+      <div class="card-sub" id="staleInfo"></div>
+      <div class="fgroup">
+        <label class="flabel">Wann war Schluss?</label>
+        <input type="datetime-local" class="finput" id="staleEnde">
+      </div>
+      <div class="timer-actions">
+        <button class="btn-secondary" style="color:var(--red)" onclick="staleVerwerfen()">🗑 Löschen</button>
+        <button class="btn-primary" onclick="staleSpeichern()">Ende speichern</button>
+      </div>
+    </div>`);
+})();
+
+function esc(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function sperre(){
+  if(busy) return false;
+  busy = true; setTimeout(() => { busy = false; }, 1200);
+  return true;
+}
 
 // ── TOAST ──────────────────────────────────────────────────────────────────────
 let toastT;
@@ -187,73 +223,189 @@ function loescheLokaleRunde(){
 function neueId(){
   return (crypto.randomUUID) ? crypto.randomUUID() : ('id-' + Date.now() + '-' + Math.random().toString(16).slice(2));
 }
+function istVeraltet(r){
+  return !!r && (Date.now() - new Date(r.start).getTime()) > MAX_RUNDE_MS;
+}
+
+// ── SENDE-WARTESCHLANGE ────────────────────────────────────────────────────────
+// Jede Aktion wird sofort lokal umgesetzt und im Hintergrund der Reihe nach gesendet.
+// Bei Netzwerkfehler bleibt sie gespeichert und wird automatisch erneut versucht.
+// Das ist sicher, weil das Backend wiederholte Anfragen mit gleicher ID ignoriert.
+const OUTBOX_KEY = 'gh3_le_outbox';
+let outbox = ladeOutbox();
+let sending = false;
+let sendPromise = Promise.resolve();
+let retryT = null;
+
+function ladeOutbox(){
+  try{ const a = JSON.parse(localStorage.getItem(OUTBOX_KEY) || '[]'); return Array.isArray(a) ? a : []; }
+  catch(e){ return []; }
+}
+function speichereOutbox(){
+  try{ localStorage.setItem(OUTBOX_KEY, JSON.stringify(outbox)); }catch(e){}
+}
+function updateSyncStatus(fehlgeschlagen){
+  const el = document.getElementById('syncStatus');
+  if(!outbox.length){ el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.className = 'sync-status' + (fehlgeschlagen ? ' err' : '');
+  const n = outbox.length === 1 ? '1 Eintrag' : outbox.length + ' Einträge';
+  el.textContent = fehlgeschlagen
+    ? '⚠️ ' + n + ' noch nicht übertragen – wird automatisch erneut versucht'
+    : '⏳ Wird übertragen …';
+}
+function enqueue(payload){
+  outbox.push(payload);
+  speichereOutbox();
+  updateSyncStatus(false);
+  verarbeiteOutbox();
+}
+async function postMitTimeout(payload){
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 60000);
+  try{
+    await fetch(WEBHOOK_BASE, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload), signal: ctrl.signal });
+  } finally { clearTimeout(t); }
+}
+function verarbeiteOutbox(){
+  if(sending) return sendPromise;
+  if(!outbox.length) return Promise.resolve();
+  sending = true;
+  sendPromise = (async () => {
+    let fehlgeschlagen = false;
+    try{
+      while(outbox.length){
+        try{
+          await postMitTimeout(outbox[0]);
+          outbox.shift();
+          speichereOutbox();
+          updateSyncStatus(false);
+        }catch(e){ console.warn('Senden fehlgeschlagen, neuer Versuch folgt:', e); fehlgeschlagen = true; break; }
+      }
+    } finally { sending = false; }
+    if(fehlgeschlagen){
+      updateSyncStatus(true);
+      clearTimeout(retryT);
+      retryT = setTimeout(verarbeiteOutbox, 15000);
+    } else {
+      updateSyncStatus(false);
+      if(aktuellerMA) ladeRundenHeute();   // Übersicht erst nach dem Senden abgleichen
+    }
+  })();
+  return sendPromise;
+}
+window.addEventListener('online', verarbeiteOutbox);
+document.addEventListener('visibilitychange', () => { if(!document.hidden) verarbeiteOutbox(); });
 
 // ── MITARBEITER LADEN ──────────────────────────────────────────────────────────
+const MA_CACHE_KEY = 'gh3_le_ma_cache';
+function leseLetztenMA(){ try{ return localStorage.getItem('gh3_le_lastMA'); }catch(e){ return null; } }
+
+function fuelleMitarbeiter(liste){
+  const sel = document.getElementById('leMa');
+  sel.innerHTML = '<option value="">– auswählen –</option>' + liste.map(n => `<option>${esc(n)}</option>`).join('');
+  if(aktuellerMA && liste.includes(aktuellerMA)) sel.value = aktuellerMA;
+}
+
+// Sofort aus dem Zwischenspeicher starten, die Netzwerk-Antwort aktualisiert danach nur noch
+function starteAusCache(){
+  let cached = [];
+  try{ cached = JSON.parse(localStorage.getItem(MA_CACHE_KEY) || '[]'); }catch(e){}
+  if(!Array.isArray(cached) || !cached.length) return;
+  fuelleMitarbeiter(cached);
+  const last = leseLetztenMA();
+  if(last && cached.includes(last)){
+    document.getElementById('leMa').value = last;
+    aktiviereMitarbeiter(last);
+  }
+}
+
 async function ladeMitarbeiter(){
   try{
     const res = await fetch(WEBHOOK_BASE + '?action=leistung_mitarbeiter&token=' + encodeURIComponent(TOKEN));
     const data = await res.json();
     if(data.status !== 'ok'){ showToast('⚠️ Zugang ungültig – bitte Link prüfen'); return; }
-    const sel = document.getElementById('leMa');
-    sel.innerHTML = '<option value="">– auswählen –</option>';
-    (data.mitarbeiter || []).forEach(name => { sel.innerHTML += `<option>${name}</option>`; });
-    let last; try{ last = localStorage.getItem('gh3_le_lastMA'); }catch(e){}
-    if(last && [...sel.options].some(o => o.value === last)){
-      sel.value = last;
-      aktuellerMA = last;
-      document.getElementById('startBtn').disabled = false;
-      document.getElementById('startWrap').style.display = '';
-      await pruefeAktuelleRunde();
-      await ladeRundenHeute();
+    const liste = data.mitarbeiter || [];
+    try{ localStorage.setItem(MA_CACHE_KEY, JSON.stringify(liste)); }catch(e){}
+    fuelleMitarbeiter(liste);
+    if(!aktuellerMA){
+      const last = leseLetztenMA();
+      if(last && liste.includes(last)){
+        document.getElementById('leMa').value = last;
+        aktiviereMitarbeiter(last);
+      }
     }
   }catch(e){ console.warn('Mitarbeiterliste konnte nicht geladen werden:', e); showToast('⚠️ Verbindung fehlgeschlagen'); }
 }
 
-document.getElementById('leMa').addEventListener('change', async function(){
-  aktuellerMA = this.value;
+async function aktiviereMitarbeiter(name){
+  aktuellerMA = name;
   try{ localStorage.setItem('gh3_le_lastMA', aktuellerMA); }catch(e){}
   document.getElementById('startBtn').disabled = !aktuellerMA;
   clearInterval(timerInterval);
   aktuelleRunde = null;
-  document.getElementById('timerCard').style.display = 'none';
-  document.getElementById('auswahlCard').style.display = 'none';
+  ['timerCard','auswahlCard','staleCard','heuteCard'].forEach(id => { document.getElementById(id).style.display = 'none'; });
   document.getElementById('startWrap').style.display = aktuellerMA ? '' : 'none';
-  document.getElementById('heuteCard').style.display = 'none';
   schliesseBearbeiten();
-  if(aktuellerMA){
-    await pruefeAktuelleRunde();
-    await ladeRundenHeute();
+  if(!aktuellerMA) return;
+
+  // Lokal gemerkte Runde sofort anzeigen (ohne auf das Netzwerk zu warten)
+  const lokal = ladeLokaleRunde();
+  if(lokal && lokal.mitarbeiter === name){
+    aktuelleRunde = lokal;
+    zeigeRunde();
   }
-});
+  await pruefeAktuelleRunde();
+  if(aktuellerMA === name) ladeRundenHeute();
+}
+
+document.getElementById('leMa').addEventListener('change', function(){ aktiviereMitarbeiter(this.value); });
 
 async function pruefeAktuelleRunde(){
-  const lokal = ladeLokaleRunde();
-  if(lokal && lokal.mitarbeiter === aktuellerMA){
-    aktuelleRunde = lokal;
-    zeigeTimer();
-    return;
+  if(aktuelleRunde) return;
+  const name = aktuellerMA;
+  // Erst ausstehende Aktionen senden, sonst sieht der Server noch den alten Stand
+  if(outbox.length){
+    await verarbeiteOutbox();
+    if(outbox.length) return;   // offline – Server kann gerade nicht gefragt werden
   }
+  if(aktuellerMA !== name || aktuelleRunde) return;
   try{
-    const res = await fetch(WEBHOOK_BASE + '?action=leistung_offene_runde&mitarbeiter=' + encodeURIComponent(aktuellerMA) + '&token=' + encodeURIComponent(TOKEN));
+    const res = await fetch(WEBHOOK_BASE + '?action=leistung_offene_runde&mitarbeiter=' + encodeURIComponent(name) + '&token=' + encodeURIComponent(TOKEN));
     const data = await res.json();
+    if(aktuellerMA !== name || aktuelleRunde) return;
     if(data.status === 'ok' && data.runde){
-      aktuelleRunde = { id: data.runde.id, mitarbeiter: aktuellerMA, kategorie: data.runde.kategorie, projekt: data.runde.projekt, start: data.runde.start };
+      aktuelleRunde = { id: data.runde.id, mitarbeiter: name, kategorie: data.runde.kategorie, projekt: data.runde.projekt, start: data.runde.start };
       speichereLokaleRunde(aktuelleRunde);
-      zeigeTimer();
+      zeigeRunde();
     }
   }catch(e){ console.warn('Konnte offene Runde nicht prüfen:', e); }
 }
 
 // ── PROJEKTE LADEN ─────────────────────────────────────────────────────────────
+const PROJ_CACHE_KEY = 'gh3_le_projekte_cache';
+function fuelleProjekte(liste){
+  const optionsHtml = '<option value="">– kein Projekt / nicht zutreffend –</option>' +
+    liste.map(name => `<option>${esc(name)}</option>`).join('') +
+    '<option value="__new__">+ Neues Projekt…</option>';
+  ['leProjekt','editProjekt'].forEach(id => {
+    const sel = document.getElementById(id);
+    const vorher = sel.value;
+    sel.innerHTML = optionsHtml;
+    if(vorher && [...sel.options].some(o => o.value === vorher)) sel.value = vorher;   // Auswahl nicht überschreiben
+  });
+}
 async function ladeProjekte(){
+  try{
+    const cached = JSON.parse(localStorage.getItem(PROJ_CACHE_KEY) || 'null');
+    if(Array.isArray(cached)) fuelleProjekte(cached);
+  }catch(e){}
   try{
     const res = await fetch(WEBHOOK_BASE + '?action=projekte');
     const data = await res.json();
-    const optionsHtml = '<option value="">– kein Projekt / nicht zutreffend –</option>' +
-      (data.projekte || []).map(name => `<option>${name}</option>`).join('') +
-      '<option value="__new__">+ Neues Projekt…</option>';
-    document.getElementById('leProjekt').innerHTML = optionsHtml;
-    document.getElementById('editProjekt').innerHTML = optionsHtml;
+    const liste = data.projekte || [];
+    try{ localStorage.setItem(PROJ_CACHE_KEY, JSON.stringify(liste)); }catch(e){}
+    fuelleProjekte(liste);
   }catch(e){ console.warn('Projektliste konnte nicht geladen werden:', e); }
 }
 document.getElementById('leProjekt').addEventListener('change', function(){
@@ -268,10 +420,11 @@ let letzteRundenHeute = [];
 
 async function ladeRundenHeute(){
   if(!aktuellerMA) return;
+  const name = aktuellerMA;
   try{
-    const res = await fetch(WEBHOOK_BASE + '?action=leistung_heute&mitarbeiter=' + encodeURIComponent(aktuellerMA) + '&token=' + encodeURIComponent(TOKEN));
+    const res = await fetch(WEBHOOK_BASE + '?action=leistung_heute&mitarbeiter=' + encodeURIComponent(name) + '&token=' + encodeURIComponent(TOKEN));
     const data = await res.json();
-    if(data.status === 'ok'){
+    if(data.status === 'ok' && aktuellerMA === name){
       letzteRundenHeute = data.runden || [];
       renderRundenHeute(letzteRundenHeute);
     }
@@ -286,16 +439,16 @@ function formatUhrzeit(iso){
 function renderRundenHeute(runden){
   const card = document.getElementById('heuteCard');
   const liste = document.getElementById('heuteListe');
-  if(!runden.length){ card.style.display = 'none'; return; }
+  if(!runden.length){ liste.innerHTML = ''; card.style.display = 'none'; return; }
   card.style.display = '';
   liste.innerHTML = runden.map(r => `
-    <div class="runde-row" onclick="oeffneBearbeiten('${r.id}')">
+    <div class="runde-row" onclick="oeffneBearbeiten('${esc(r.id)}')">
       <div>
-        <div class="runde-info">${r.kategorie}</div>
-        ${r.projekt ? `<div class="runde-projekt">${r.projekt}</div>` : ''}
+        <div class="runde-info">${esc(r.kategorie)}</div>
+        ${r.projekt ? `<div class="runde-projekt">${esc(r.projekt)}</div>` : ''}
       </div>
       <div>
-        <div class="runde-dauer">${r.dauerMin} Min</div>
+        <div class="runde-dauer">${esc(r.dauerMin)} Min</div>
         <div class="runde-zeit">${formatUhrzeit(r.start)}–${formatUhrzeit(r.ende)}</div>
       </div>
     </div>
@@ -369,7 +522,7 @@ function schliesseBearbeiten(){
   document.getElementById('bearbeitenCard').style.display = 'none';
 }
 
-async function speichereBearbeitung(){
+function speichereBearbeitung(){
   if(!bearbeiteteRunde) return;
   if(!editKategorie){ showToast('⚠️ Bitte Kategorie auswählen'); return; }
 
@@ -389,20 +542,29 @@ async function speichereBearbeitung(){
   const neuStart = new Date(basisDatum); neuStart.setHours(hS, mS, 0, 0);
   const neuEnde = new Date(basisDatum); neuEnde.setHours(hE, mE, 0, 0);
   if(neuEnde <= neuStart){ showToast('⚠️ Ende muss nach Start liegen'); return; }
+  if(!sperre()) return;
 
-  await sendToSheet({ type:'leistung_update', token: TOKEN, id: bearbeiteteRunde.id, kategorie, projekt, startZeit: neuStart.toISOString(), endZeit: neuEnde.toISOString() });
+  const id = bearbeiteteRunde.id;
+  enqueue({ type:'leistung_update', token: TOKEN, id, kategorie, projekt, startZeit: neuStart.toISOString(), endZeit: neuEnde.toISOString() });
+  // Anzeige sofort anpassen, der Abgleich mit dem Sheet folgt nach dem Senden
+  letzteRundenHeute = letzteRundenHeute.map(r => r.id === id
+    ? Object.assign({}, r, { kategorie, projekt, start: neuStart.toISOString(), ende: neuEnde.toISOString(), dauerMin: Math.round((neuEnde - neuStart) / 60000) })
+    : r);
+  renderRundenHeute(letzteRundenHeute);
   schliesseBearbeiten();
   showToast('✅ Runde aktualisiert');
-  await ladeRundenHeute();
 }
 
-async function loescheAktuelleRunde(){
+function loescheAktuelleRunde(){
   if(!bearbeiteteRunde) return;
   if(!confirm('Diese Runde wirklich löschen?')) return;
-  await sendToSheet({ type:'leistung_delete', token: TOKEN, id: bearbeiteteRunde.id });
+  if(!sperre()) return;
+  const id = bearbeiteteRunde.id;
+  enqueue({ type:'leistung_delete', token: TOKEN, id });
+  letzteRundenHeute = letzteRundenHeute.filter(r => r.id !== id);
+  renderRundenHeute(letzteRundenHeute);
   schliesseBearbeiten();
   showToast('🗑 Runde gelöscht');
-  await ladeRundenHeute();
 }
 
 // ── AUSWAHL-PANEL (Start ODER Wechsel) ──────────────────────────────────────────
@@ -421,7 +583,7 @@ function zeigeAuswahl(modus){
   document.getElementById('timerCard').style.display = 'none';
 }
 
-async function bestaetigeAuswahl(){
+function bestaetigeAuswahl(){
   if(!ausgewaehlteKategorie){ showToast('⚠️ Bitte auswählen, was du gerade machst'); return; }
 
   let kategorie = ausgewaehlteKategorie;
@@ -434,29 +596,34 @@ async function bestaetigeAuswahl(){
   let projekt = document.getElementById('leProjekt').value;
   if(projekt === '__new__'){ projekt = document.getElementById('leProjektNeu').value.trim(); }
 
+  if(auswahlModus === 'wechsel' && istVeraltet(aktuelleRunde)){ zeigeVeraltet(); return; }
+  if(!sperre()) return;
+
   const jetzt = new Date().toISOString();
   const id = neueId();
 
-  if(auswahlModus === 'start'){
-    aktuelleRunde = { id, mitarbeiter: aktuellerMA, kategorie, projekt, start: jetzt };
-    await sendToSheet({ type:'leistung_start', token: TOKEN, id, mitarbeiter: aktuellerMA, kategorie, projekt, startZeit: jetzt });
+  if(auswahlModus === 'wechsel' && aktuelleRunde){
+    enqueue({ type:'leistung_wechsel', token: TOKEN, id: aktuelleRunde.id, mitarbeiter: aktuellerMA, endZeit: jetzt, neue: { id, kategorie, projekt, startZeit: jetzt } });
   } else {
-    const alteId = aktuelleRunde.id;
-    await sendToSheet({ type:'leistung_wechsel', token: TOKEN, id: alteId, mitarbeiter: aktuellerMA, endZeit: jetzt, neue: { id, kategorie, projekt, startZeit: jetzt } });
-    aktuelleRunde = { id, mitarbeiter: aktuellerMA, kategorie, projekt, start: jetzt };
+    enqueue({ type:'leistung_start', token: TOKEN, id, mitarbeiter: aktuellerMA, kategorie, projekt, startZeit: jetzt });
   }
-
+  aktuelleRunde = { id, mitarbeiter: aktuellerMA, kategorie, projekt, start: jetzt };
   speichereLokaleRunde(aktuelleRunde);
-  zeigeTimer();
-  await ladeRundenHeute();
+  zeigeTimer();   // sofort – das Senden läuft im Hintergrund
 }
 
-function naechsteRunde(){ zeigeAuswahl('wechsel'); }
+function naechsteRunde(){
+  if(!aktuelleRunde){ zeigeAuswahl('start'); return; }
+  if(istVeraltet(aktuelleRunde)){ zeigeVeraltet(); return; }
+  zeigeAuswahl('wechsel');
+}
 
-async function rundeFertig(){
+function rundeFertig(){
   if(!aktuelleRunde) return;
+  if(istVeraltet(aktuelleRunde)){ zeigeVeraltet(); return; }
+  if(!sperre()) return;
   const jetzt = new Date().toISOString();
-  await sendToSheet({ type:'leistung_stop', token: TOKEN, id: aktuelleRunde.id, endZeit: jetzt });
+  enqueue({ type:'leistung_stop', token: TOKEN, id: aktuelleRunde.id, endZeit: jetzt });
   aktuelleRunde = null;
   loescheLokaleRunde();
   clearInterval(timerInterval);
@@ -464,21 +631,74 @@ async function rundeFertig(){
   document.getElementById('auswahlCard').style.display = 'none';
   document.getElementById('startWrap').style.display = '';
   showToast('✅ Runde gespeichert');
-  await ladeRundenHeute();
+}
+
+// ── ALTE (ÜBER 12 STD. OFFENE) RUNDE KLÄREN ──────────────────────────────────
+function lokalInput(d){
+  const p = n => String(n).padStart(2,'0');
+  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function zeigeVeraltet(){
+  clearInterval(timerInterval);
+  ['auswahlCard','timerCard','startWrap'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+  const r = aktuelleRunde;
+  const start = new Date(r.start);
+  document.getElementById('staleInfo').textContent =
+    r.kategorie + (r.projekt ? ' · ' + r.projekt : '') + ' – gestartet am ' +
+    start.toLocaleDateString('de-DE') + ' um ' + formatUhrzeit(r.start) + ' Uhr und nie beendet.';
+  const feld = document.getElementById('staleEnde');
+  feld.min = lokalInput(start);
+  feld.max = lokalInput(new Date());
+  feld.value = '';
+  document.getElementById('staleCard').style.display = '';
+}
+function beendeAlteRunde(){
+  aktuelleRunde = null;
+  loescheLokaleRunde();
+  document.getElementById('staleCard').style.display = 'none';
+  document.getElementById('startWrap').style.display = '';
+}
+function staleSpeichern(){
+  if(!aktuelleRunde) return;
+  const wert = document.getElementById('staleEnde').value;
+  if(!wert){ showToast('⚠️ Bitte eintragen, wann Schluss war'); return; }
+  const start = new Date(aktuelleRunde.start);
+  const ende = new Date(wert);
+  if(isNaN(ende.getTime()) || ende <= start){ showToast('⚠️ Ende muss nach dem Start liegen'); return; }
+  if(ende > new Date()){ showToast('⚠️ Ende darf nicht in der Zukunft liegen'); return; }
+  if(ende - start > 16 * 3600 * 1000){ showToast('⚠️ Mehr als 16 Std. nach dem Start – bitte prüfen'); return; }
+  if(!sperre()) return;
+  enqueue({ type:'leistung_update', token: TOKEN, id: aktuelleRunde.id, kategorie: aktuelleRunde.kategorie, projekt: aktuelleRunde.projekt || '', startZeit: aktuelleRunde.start, endZeit: ende.toISOString() });
+  beendeAlteRunde();
+  showToast('✅ Runde beendet');
+}
+function staleVerwerfen(){
+  if(!aktuelleRunde) return;
+  if(!confirm('Diese Runde wirklich löschen?')) return;
+  if(!sperre()) return;
+  enqueue({ type:'leistung_delete', token: TOKEN, id: aktuelleRunde.id });
+  beendeAlteRunde();
+  showToast('🗑 Runde gelöscht');
 }
 
 // ── TIMER-ANZEIGE ────────────────────────────────────────────────────────────
+function zeigeRunde(){
+  if(istVeraltet(aktuelleRunde)) zeigeVeraltet(); else zeigeTimer();
+}
 function zeigeTimer(){
   document.getElementById('auswahlCard').style.display = 'none';
   document.getElementById('startWrap').style.display = 'none';
+  document.getElementById('staleCard').style.display = 'none';
   document.getElementById('timerCard').style.display = '';
   document.getElementById('timerKategorieLabel').textContent =
     aktuelleRunde.kategorie + (aktuelleRunde.projekt ? ' · ' + aktuelleRunde.projekt : '');
+  document.getElementById('timerWarnung').textContent = '⚠️ Läuft seit über 12 Std. – bitte beenden und die Endzeit angeben.';
   clearInterval(timerInterval);
   updateTimerDisplay();
   timerInterval = setInterval(updateTimerDisplay, 1000);
 }
 function updateTimerDisplay(){
+  if(!aktuelleRunde) return;
   const diffMs = Date.now() - new Date(aktuelleRunde.start).getTime();
   const totalSec = Math.max(0, Math.floor(diffMs/1000));
   const h = String(Math.floor(totalSec/3600)).padStart(2,'0');
@@ -488,19 +708,15 @@ function updateTimerDisplay(){
   document.getElementById('timerWarnung').style.display = (totalSec > 12*3600) ? '' : 'none';
 }
 
-// ── SENDEN ─────────────────────────────────────────────────────────────────────
-async function sendToSheet(payload){
-  try{
-    await fetch(WEBHOOK_BASE, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-  }catch(e){ console.warn('Fehler beim Senden:', e); }
-}
-
 // ── INIT ───────────────────────────────────────────────────────────────────────
 if(!TOKEN){
   document.getElementById('tokenError').style.display = '';
 } else {
+  updateSyncStatus(false);
+  starteAusCache();
   ladeMitarbeiter();
   ladeProjekte();
+  verarbeiteOutbox();
 }
 
 // ── SERVICE WORKER (Auto-Update) ──────────────────────────────────────────────
@@ -529,5 +745,3 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-</body>
-</html>
