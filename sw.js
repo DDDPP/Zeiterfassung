@@ -1,6 +1,6 @@
 // ── GARTEN HOCH 3 – Service Worker ────────────────────────────────────────────
 // Version hier hochzählen bei jedem Update → löst automatisches Update aus
-const CACHE_VERSION = 'gh3-v26';
+const CACHE_VERSION = 'gh3-v27';
 const CACHE_FILES = [
   './zeiterfassung.html',
   './baustellenbericht.html',
@@ -25,7 +25,9 @@ self.addEventListener('activate', event => {
 // Fetch: Cache-first, dann Netzwerk
 self.addEventListener('fetch', event => {
   event.respondWith(
-    caches.match(event.request).then(cached => cached || fetch(event.request))
+    // ignoreSearch nur für eigene Dateien: Seiten mit ?token=... kommen so aus dem Cache
+    caches.match(event.request, {ignoreSearch: new URL(event.request.url).origin === self.location.origin})
+      .then(cached => cached || fetch(event.request))
   );
 });
 // Update auf Anfrage der App

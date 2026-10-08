@@ -8,6 +8,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Zeiterfassung">
 <meta name="theme-color" content="#2D6A2D">
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="180x180" href="apple-touch-icon.png">
 <style>
@@ -295,57 +297,107 @@ const WEBHOOK_BASE = 'https://script.google.com/macros/s/AKfycbw1AOqcgtunqJpDKU5
 
 let MITARBEITER = [];
 let RESOLVED_MA = null; // per Token vom Server aufgelöster Mitarbeitername (ersetzt ?ma=Name)
+const URL_TOKEN = new URLSearchParams(window.location.search).get('token');
 function getMaParam(){ return RESOLVED_MA; }
 
+// Fester Name statt Dropdown (Token-Link). Das Dropdown bleibt im DOM, nur ausgeblendet.
+function zeigeFesterName(text, muted){
+  const sel = document.getElementById('ma');
+  sel.style.display = 'none';
+  let span = document.getElementById('maFixed');
+  if (!span) {
+    span = document.createElement('span');
+    span.id = 'maFixed';
+    span.style.cssText = 'font-size:15px;padding:9px 12px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;flex:1';
+    sel.parentNode.appendChild(span);
+  }
+  span.textContent = text;
+  span.style.fontWeight = muted ? '500' : '700';
+  span.style.color = muted ? 'var(--muted)' : 'var(--text)';
+}
+function zeigeDropdown() {
+  document.getElementById('ma').style.display = '';
+  const span = document.getElementById('maFixed');
+  if (span) span.remove();
+}
+
+// Mitarbeiter steht fest (aus Cache oder vom Server bestätigt)
+function setzeMitarbeiter(name) {
+  RESOLVED_MA = name;
+  MITARBEITER = [name];
+  const eName = document.getElementById('eName');
+  eName.innerHTML = '';
+  const opt = document.createElement('option');
+  opt.textContent = name;
+  eName.appendChild(opt);
+  zeigeFesterName(name, false);
+  refreshStempelUI();
+  renderEntries();
+}
+
+// Token-Link: Name sofort aus dem lokalen Cache, Server prüft im Hintergrund.
+// Die Mitarbeiterliste wird hier nicht gebraucht und nicht geladen.
 async function ladeMitarbeiter() {
+  if (!URL_TOKEN) { return ladeMitarbeiterListe(); }
+
+  const cached = safeGet('gh3_token_ma', null);
+  const hatCache = !!(cached && cached.token === URL_TOKEN && cached.name);
+  if (hatCache) setzeMitarbeiter(cached.name);
+  else zeigeFesterName('Wird geladen …', true);
+
   try {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-    if (token) {
-      try {
-        const resT = await fetch(WEBHOOK_BASE + "?action=resolve&token=" + encodeURIComponent(token));
-        const dataT = await resT.json();
-        if (dataT.name) RESOLVED_MA = dataT.name;
-      } catch(e) { console.warn("Token konnte nicht aufgelöst werden:", e); alert("TOKEN-FEHLER: " + e.message); }
+    const resT = await fetch(WEBHOOK_BASE + "?action=resolve&token=" + encodeURIComponent(URL_TOKEN));
+    const dataT = await resT.json();
+    if (dataT.name) {
+      safeSet('gh3_token_ma', {token: URL_TOKEN, name: dataT.name});
+      if (dataT.name !== RESOLVED_MA) setzeMitarbeiter(dataT.name);
+      return;
     }
-    const url = WEBHOOK_BASE + "?action=mitarbeiter";
-    const res = await fetch(url);
+    // Token ungültig: Cache verwerfen, Verhalten wie bisher (Dropdown mit Liste)
+    safeSet('gh3_token_ma', null);
+    RESOLVED_MA = null;
+    zeigeDropdown();
+  } catch(e) {
+    console.warn("Token konnte nicht aufgelöst werden:", e);
+    if (hatCache) return; // offline/Funkloch: mit gespeichertem Namen weiterarbeiten
+    zeigeDropdown();
+    alert("TOKEN-FEHLER: " + e.message);
+  }
+  return ladeMitarbeiterListe();
+}
+
+// Dropdown-Modus (ohne Token): Liste aus dem Cache, Aktualisierung im Hintergrund
+async function ladeMitarbeiterListe() {
+  const cachedListe = safeGet('gh3_ma_liste', null);
+  if (Array.isArray(cachedListe) && cachedListe.length) {
+    MITARBEITER = cachedListe;
+    befuelleDropdowns();
+  }
+  try {
+    const res = await fetch(WEBHOOK_BASE + "?action=mitarbeiter");
     const data = await res.json();
     if (data.mitarbeiter && data.mitarbeiter.length > 0) {
       MITARBEITER = data.mitarbeiter;
+      safeSet('gh3_ma_liste', MITARBEITER);
       befuelleDropdowns();
-      const maParam = getMaParam();
-      if (maParam) {
-        const sel = document.getElementById('ma');
-        for (let i = 0; i < sel.options.length; i++) {
-          if (sel.options[i].text === maParam || sel.options[i].value === maParam) {
-            sel.selectedIndex = i;
-            refreshStempelUI();
-            break;
-          }
-        }
-        const nameRow = document.querySelector('.name-row');
-        nameRow.innerHTML = `
-          <span style="font-size:13px;color:var(--muted);font-weight:500">Mitarbeiter:</span>
-          <span style="font-size:15px;font-weight:700;color:var(--text);padding:9px 12px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;flex:1">${maParam}</span>
-        `;
-      }
     }
   } catch(e) {
     console.warn("Mitarbeiterliste konnte nicht geladen werden:", e);
-    alert("MITARBEITER-FEHLER: " + e.message);
+    if (!MITARBEITER.length) alert("MITARBEITER-FEHLER: " + e.message);
   }
 }
 
 function befuelleDropdowns() {
   const selMA = document.getElementById('ma');
   const selEdit = document.getElementById('eName');
+  const aktuell = selMA.value;
   selMA.innerHTML = '<option value="">– auswählen –</option>';
   selEdit.innerHTML = '';
   MITARBEITER.forEach(name => {
     selMA.innerHTML += `<option>${name}</option>`;
     selEdit.innerHTML += `<option>${name}</option>`;
   });
+  if (aktuell && MITARBEITER.includes(aktuell)) selMA.value = aktuell;
 }
 
 // ── STATE ──────────────────────────────────────────────────────────────────────
@@ -397,11 +449,16 @@ function showTab(n){
 }
 
 // ── GET MA ─────────────────────────────────────────────────────────────────────
-function getMA(){
+function getMA(silent){
   const maParam = getMaParam();
   if(maParam) return maParam;
   const v=document.getElementById('ma').value;
-  if(!v){showToast('⚠️ Bitte zuerst Mitarbeiter auswählen');return null}
+  if(!v){
+    if(!silent) showToast(URL_TOKEN && document.getElementById('maFixed')
+      ? '⏳ Mitarbeiter wird noch geladen – gleich nochmal versuchen'
+      : '⚠️ Bitte zuerst Mitarbeiter auswählen');
+    return null;
+  }
   return v;
 }
 document.getElementById('ma').addEventListener('change',()=>{
@@ -576,7 +633,7 @@ function confirmPause(useLegal){
 }
 
 function refreshStempelUI(){
-  const name=getMA();
+  const name=getMA(true);
   if(!name) return;
   const today=new Date().toISOString().split('T')[0];
   const e=entries.find(x=>x.name===name && x.date===today);
@@ -653,7 +710,7 @@ function refreshStempelUI(){
 
 // ── WEEK ───────────────────────────────────────────────────────────────────────
 function renderWeek(){
-  const name=getMA();
+  const name=getMA(true);
   const card=document.getElementById('weekCard');
   const today=new Date();
   const mon=new Date(today); mon.setDate(today.getDate()-((today.getDay()+6)%7));
