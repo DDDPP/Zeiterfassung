@@ -384,9 +384,20 @@ async function pruefeAktuelleRunde(){
 
 // ── PROJEKTE LADEN ─────────────────────────────────────────────────────────────
 const PROJ_CACHE_KEY = 'gh3_le_projekte_cache';
+// Anordnung: Die Liste kommt vom Server in Anlege-Reihenfolge (neueste zuletzt).
+// Ab NEU_SCHWELLE Projekten stehen die NEU_ANZAHL neuesten oben als eigene Gruppe,
+// darunter folgt die vollständige Liste alphabetisch. Kurze Listen: nur A–Z.
+const NEU_ANZAHL = 5, NEU_SCHWELLE = 8;
 function fuelleProjekte(liste){
+  const alle = [...new Set((liste || []).filter(Boolean))];
+  const az = [...alle].sort((a, b) => a.localeCompare(b, 'de', { sensitivity: 'base', numeric: true }));
+  const opt = name => `<option>${esc(name)}</option>`;
+  const projektOptionen = alle.length > NEU_SCHWELLE
+    ? '<optgroup label="Zuletzt angelegt">' + alle.slice(-NEU_ANZAHL).reverse().map(opt).join('') + '</optgroup>' +
+      '<optgroup label="Alle Projekte A–Z">' + az.map(opt).join('') + '</optgroup>'
+    : az.map(opt).join('');
   const optionsHtml = '<option value="">– kein Projekt / nicht zutreffend –</option>' +
-    liste.map(name => `<option>${esc(name)}</option>`).join('') +
+    projektOptionen +
     '<option value="__new__">+ Neues Projekt…</option>';
   ['leProjekt','editProjekt'].forEach(id => {
     const sel = document.getElementById(id);
@@ -394,6 +405,16 @@ function fuelleProjekte(liste){
     sel.innerHTML = optionsHtml;
     if(vorher && [...sel.options].some(o => o.value === vorher)) sel.value = vorher;   // Auswahl nicht überschreiben
   });
+}
+// Neu eingetragenes Projekt sofort in die Liste aufnehmen (steht dann oben bei "Zuletzt angelegt")
+function merkeNeuesProjekt(name){
+  if(!name) return;
+  let liste = [];
+  try{ liste = JSON.parse(localStorage.getItem(PROJ_CACHE_KEY) || '[]') || []; }catch(e){}
+  if(liste.some(p => String(p).toLowerCase() === name.toLowerCase())) return;
+  liste.push(name);
+  try{ localStorage.setItem(PROJ_CACHE_KEY, JSON.stringify(liste)); }catch(e){}
+  fuelleProjekte(liste);
 }
 async function ladeProjekte(){
   try{
@@ -534,7 +555,7 @@ function speichereBearbeitung(){
   }
 
   let projekt = document.getElementById('editProjekt').value;
-  if(projekt === '__new__'){ projekt = document.getElementById('editProjektNeu').value.trim(); }
+  if(projekt === '__new__'){ projekt = document.getElementById('editProjektNeu').value.trim(); merkeNeuesProjekt(projekt); }
 
   const basisDatum = new Date(bearbeiteteRunde.start);
   const [hS, mS] = document.getElementById('editStart').value.split(':').map(Number);
@@ -594,7 +615,8 @@ function bestaetigeAuswahl(){
   }
 
   let projekt = document.getElementById('leProjekt').value;
-  if(projekt === '__new__'){ projekt = document.getElementById('leProjektNeu').value.trim(); }
+  let projektIstNeu = false;
+  if(projekt === '__new__'){ projekt = document.getElementById('leProjektNeu').value.trim(); projektIstNeu = true; }
 
   if(auswahlModus === 'wechsel' && istVeraltet(aktuelleRunde)){ zeigeVeraltet(); return; }
   if(!sperre()) return;
@@ -609,6 +631,7 @@ function bestaetigeAuswahl(){
   }
   aktuelleRunde = { id, mitarbeiter: aktuellerMA, kategorie, projekt, start: jetzt };
   speichereLokaleRunde(aktuelleRunde);
+  if(projektIstNeu) merkeNeuesProjekt(projekt);
   zeigeTimer();   // sofort – das Senden läuft im Hintergrund
 }
 
