@@ -303,7 +303,8 @@ function leseLetztenMA(){ try{ return localStorage.getItem('gh3_le_lastMA'); }ca
 
 function fuelleMitarbeiter(liste){
   const sel = document.getElementById('leMa');
-  sel.innerHTML = '<option value="">– auswählen –</option>' + liste.map(n => `<option>${esc(n)}</option>`).join('');
+  const az = [...liste].sort((a, b) => a.localeCompare(b, 'de', { sensitivity: 'base', numeric: true }));   // alphabetisch A–Z
+  sel.innerHTML = '<option value="">– auswählen –</option>' + az.map(n => `<option>${esc(n)}</option>`).join('');
   if(aktuellerMA && liste.includes(aktuellerMA)) sel.value = aktuellerMA;
 }
 
