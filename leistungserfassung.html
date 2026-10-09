@@ -227,6 +227,30 @@ function istVeraltet(r){
   return !!r && (Date.now() - new Date(r.start).getTime()) > MAX_RUNDE_MS;
 }
 
+// ── PROJEKT-VORAUSWAHL (pro Gerät) ─────────────────────────────────────────────
+// Das zuletzt gewählte Projekt ist in der nächsten Runde vorausgewählt (aber frei änderbar).
+// Es wird bei „Fertig" gelöscht und gilt nur am selben Tag und für denselben Mitarbeiter.
+const VORAUSWAHL_KEY = 'gh3_le_projekt_vorauswahl';
+function heuteLokal(){
+  const d = new Date(), p = n => String(n).padStart(2,'0');
+  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
+}
+// Gibt das Projekt zurück ('' = bewusst kein Projekt) oder null, wenn keine Vorauswahl vorhanden ist
+function ladeVorauswahl(){
+  try{
+    const v = JSON.parse(localStorage.getItem(VORAUSWAHL_KEY) || 'null');
+    if(!v) return null;
+    if(v.datum !== heuteLokal()){ localStorage.removeItem(VORAUSWAHL_KEY); return null; }   // von gestern oder älter
+    return v.mitarbeiter === aktuellerMA ? (v.projekt || '') : null;
+  }catch(e){ return null; }
+}
+function speichereVorauswahl(projekt){
+  try{ localStorage.setItem(VORAUSWAHL_KEY, JSON.stringify({ mitarbeiter: aktuellerMA, projekt: projekt || '', datum: heuteLokal() })); }catch(e){}
+}
+function loescheVorauswahl(){
+  try{ localStorage.removeItem(VORAUSWAHL_KEY); }catch(e){}
+}
+
 // ── SENDE-WARTESCHLANGE ────────────────────────────────────────────────────────
 // Jede Aktion wird sofort lokal umgesetzt und im Hintergrund der Reihe nach gesendet.
 // Bei Netzwerkfehler bleibt sie gespeichert und wird automatisch erneut versucht.
@@ -589,7 +613,11 @@ function zeigeAuswahl(modus){
   document.getElementById('katSonstigesText').value = '';
   document.getElementById('katSonstigesText').style.display = 'none';
   renderKatChips();
-  document.getElementById('leProjekt').value = '';
+  // Vorauswahl: zuletzt gewähltes Projekt (Fallback beim Wechsel: Projekt der laufenden Runde)
+  let vorauswahl = ladeVorauswahl();
+  if(vorauswahl === null && modus === 'wechsel' && aktuelleRunde) vorauswahl = aktuelleRunde.projekt || '';
+  const projektSel = document.getElementById('leProjekt');
+  projektSel.value = (vorauswahl && [...projektSel.options].some(o => o.value === vorauswahl)) ? vorauswahl : '';
   document.getElementById('leProjektNeu').style.display = 'none';
   document.getElementById('leProjektNeu').value = '';
   document.getElementById('bestaetigenBtn').textContent = modus === 'start' ? 'Starten' : 'Wechseln';
@@ -617,6 +645,7 @@ function bestaetigeAuswahl(){
 
   const jetzt = new Date().toISOString();
   const id = neueId();
+  speichereVorauswahl(projekt);   // bleibt Vorauswahl der nächsten Runde, bis „Fertig"
 
   if(auswahlModus === 'wechsel' && aktuelleRunde){
     enqueue({ type:'leistung_wechsel', token: TOKEN, id: aktuelleRunde.id, mitarbeiter: aktuellerMA, endZeit: jetzt, neue: { id, kategorie, projekt, startZeit: jetzt } });
@@ -643,6 +672,7 @@ function rundeFertig(){
   enqueue({ type:'leistung_stop', token: TOKEN, id: aktuelleRunde.id, endZeit: jetzt });
   aktuelleRunde = null;
   loescheLokaleRunde();
+  loescheVorauswahl();
   clearInterval(timerInterval);
   document.getElementById('timerCard').style.display = 'none';
   document.getElementById('auswahlCard').style.display = 'none';
@@ -672,6 +702,7 @@ function zeigeVeraltet(){
 function beendeAlteRunde(){
   aktuelleRunde = null;
   loescheLokaleRunde();
+  loescheVorauswahl();
   document.getElementById('staleCard').style.display = 'none';
   document.getElementById('startWrap').style.display = '';
 }
