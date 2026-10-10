@@ -191,19 +191,7 @@
         ⚠️ Nur aktueller und vorheriger Monat erlaubt
       </div>
     </div>
-    <div class="frow">
-      <div class="fgroup"><label class="flabel">Beginn</label><input type="time" class="finput" id="eStart"></div>
-      <div class="fgroup"><label class="flabel">Ende</label><input type="time" class="finput" id="eEnd"></div>
-    </div>
-    <div class="fgroup">
-      <label class="flabel">Gesetzliche Pause</label>
-      <div class="finput" style="background:#f3f4f6;color:var(--muted)" id="ePauseDisplay">–</div>
-      <div class="pause-hint" id="ePauseHint"></div>
-    </div>
-    <div class="fgroup">
-      <label class="flabel">Berechnete Arbeitszeit</label>
-      <div class="finput" style="background:#f3f4f6;font-weight:700" id="eNetDisplay">–</div>
-    </div>
+    <div id="eShifts"></div>
     <div class="fgroup">
       <label class="flabel">Projekt</label>
       <input type="text" class="finput" id="eNote" placeholder="z.B. Kunde Müller">
@@ -811,8 +799,8 @@ function openEditModal(idx){
     document.getElementById('eName').disabled = false;
   }
   document.getElementById('eDate').value=e.date;
-  document.getElementById('eStart').value=(e.shifts&&e.shifts[0])?e.shifts[0].start||'':'';
-  document.getElementById('eEnd').value=(e.shifts&&e.shifts[0])?e.shifts[0].end||'':'';
+  editShifts=(e.shifts&&e.shifts.length)?e.shifts.map(s=>({...s})):[{start:null,end:null,pause:null,net:null,location:null}];
+  renderShiftFields();
   document.getElementById('eNote').value=e.note||'';
   document.getElementById('eTaetigkeiten').value=e.taetigkeiten||'';
   updateCalcDisplay();
@@ -829,8 +817,8 @@ function openAddModal(){
     document.getElementById('eName').disabled = false;
   }
   document.getElementById('eDate').value=new Date().toISOString().split('T')[0];
-  document.getElementById('eStart').value='';
-  document.getElementById('eEnd').value='';
+  editShifts=[{start:null,end:null,pause:null,net:null,location:null}];
+  renderShiftFields();
   document.getElementById('eNote').value='';
   document.getElementById('eTaetigkeiten').value='';
   updateCalcDisplay();
@@ -838,22 +826,63 @@ function openAddModal(){
 }
 function closeModal(){document.getElementById('editModal').classList.add('hidden')}
 
-function updateCalcDisplay(){
-  const s=document.getElementById('eStart').value;
-  const en=document.getElementById('eEnd').value;
-  const calc=calcEntry(s,en);
-  if(calc){
-    document.getElementById('ePauseDisplay').textContent=pauseText(calc.pauseMins);
-    document.getElementById('eNetDisplay').textContent=fmtMins(calc.netMins)+' Stunden';
-    document.getElementById('ePauseHint').textContent='';
-  } else {
-    document.getElementById('ePauseDisplay').textContent='–';
-    document.getElementById('eNetDisplay').textContent='–';
-    document.getElementById('ePauseHint').textContent=s&&en?'⚠️ Ende muss nach Beginn liegen':'';
-  }
+// Schicht-Felder im Dialog: pro vorhandener Schicht (max. 3) ein Block
+let editShifts=[];
+// Wie calcEntry, lässt aber 0-Minuten-Schichten (Beginn = Ende) zu, damit bestehende Einträge speicherbar bleiben
+function calcShift(s,en){
+  if(s&&en&&s===en) return {rawMins:0,pauseMins:0,netMins:0};
+  return calcEntry(s,en);
 }
-document.getElementById('eStart').addEventListener('change',updateCalcDisplay);
-document.getElementById('eEnd').addEventListener('change',updateCalcDisplay);
+function renderShiftFields(){
+  const multi=editShifts.length>1;
+  const grey='background:#f3f4f6';
+  const blocks=editShifts.map((s,i)=>{
+    const head=multi?`<div class="flabel" style="color:var(--text);font-size:13px">Schicht ${i+1}</div>`:'';
+    const times=`<div class="frow">
+        <div class="fgroup"><label class="flabel">Beginn</label><input type="time" class="finput" id="eStart${i}" value="${s.start||''}" oninput="updateCalcDisplay()" onchange="updateCalcDisplay()"></div>
+        <div class="fgroup"><label class="flabel">Ende</label><input type="time" class="finput" id="eEnd${i}" value="${s.end||''}" oninput="updateCalcDisplay()" onchange="updateCalcDisplay()"></div>
+      </div>`;
+    const calcHTML=multi
+      ? `<div class="frow">
+          <div class="fgroup"><label class="flabel">Pause</label><div class="finput" style="${grey};color:var(--muted)" id="ePauseDisplay${i}">–</div></div>
+          <div class="fgroup"><label class="flabel">Arbeitszeit</label><div class="finput" style="${grey};font-weight:700" id="eNetDisplay${i}">–</div></div>
+        </div>
+        <div class="pause-hint" id="ePauseHint${i}"></div>`
+      : `<div class="fgroup">
+          <label class="flabel">Gesetzliche Pause</label>
+          <div class="finput" style="${grey};color:var(--muted)" id="ePauseDisplay${i}">–</div>
+          <div class="pause-hint" id="ePauseHint${i}"></div>
+        </div>
+        <div class="fgroup">
+          <label class="flabel">Berechnete Arbeitszeit</label>
+          <div class="finput" style="${grey};font-weight:700" id="eNetDisplay${i}">–</div>
+        </div>`;
+    return `<div style="${i>0?'margin-top:4px;padding-top:12px;border-top:1px solid var(--border)':''}">${head}${times}${calcHTML}</div>`;
+  }).join('');
+  const total=multi?`<div class="fgroup"><label class="flabel">Gesamt-Arbeitszeit</label><div class="finput" style="${grey};font-weight:700" id="eTotalDisplay">–</div></div>`:'';
+  document.getElementById('eShifts').innerHTML=blocks+total;
+}
+function updateCalcDisplay(){
+  let total=0, any=false;
+  editShifts.forEach((_,i)=>{
+    const s=document.getElementById('eStart'+i).value;
+    const en=document.getElementById('eEnd'+i).value;
+    const calc=calcShift(s,en);
+    const multi=editShifts.length>1;
+    if(calc){
+      document.getElementById('ePauseDisplay'+i).textContent=multi?calc.pauseMins+' Min':pauseText(calc.pauseMins);
+      document.getElementById('eNetDisplay'+i).textContent=fmtMins(calc.netMins)+(multi?'':' Stunden');
+      document.getElementById('ePauseHint'+i).textContent='';
+      total+=calc.netMins; any=true;
+    } else {
+      document.getElementById('ePauseDisplay'+i).textContent='–';
+      document.getElementById('eNetDisplay'+i).textContent='–';
+      document.getElementById('ePauseHint'+i).textContent=s&&en?'⚠️ Ende muss nach Beginn liegen':'';
+    }
+  });
+  const t=document.getElementById('eTotalDisplay');
+  if(t) t.textContent=any?fmtMins(total)+' Stunden':'–';
+}
 document.getElementById('eDate').addEventListener('change',function(){
   const hinweis = document.getElementById('datumHinweis');
   if(hinweis) hinweis.style.display = isDatumErlaubt(this.value) ? 'none' : 'block';
@@ -874,14 +903,23 @@ function isDatumErlaubt(dateStr) {
 }
 
 function saveEntry(){
-  const s=document.getElementById('eStart').value;
-  const en=document.getElementById('eEnd').value;
   const dateVal=document.getElementById('eDate').value;
   if(!isDatumErlaubt(dateVal)){
     showToast('⚠️ Nur aktueller und vorheriger Monat erlaubt');
     return;
   }
-  const calc=s&&en?calcEntry(s,en):null;
+  // Alle Schichten aus dem Dialog übernehmen (Standort der bestehenden Schicht bleibt erhalten)
+  const newShifts=[];
+  for(let i=0;i<editShifts.length;i++){
+    const s=document.getElementById('eStart'+i).value;
+    const en=document.getElementById('eEnd'+i).value;
+    const calc=s&&en?calcShift(s,en):null;
+    if(s&&en&&!calc){
+      showToast(editShifts.length>1?`⚠️ Schicht ${i+1}: Ende muss nach Beginn liegen`:'⚠️ Ende muss nach Beginn liegen');
+      return;
+    }
+    newShifts.push({start:s||null, end:en||null, pause:calc?calc.pauseMins:null, net:calc?calc.netMins:null, location:editShifts[i].location||null});
+  }
   const heute = new Date().toISOString().split('T')[0];
   let notiz = document.getElementById('eNote').value;
   if (dateVal !== heute) {
@@ -894,7 +932,7 @@ function saveEntry(){
     name:document.getElementById('eName').value,
     date:dateVal,
     type:'work',
-    shifts:[{start:s||null, end:en||null, pause:calc?calc.pauseMins:null, net:calc?calc.netMins:null, location:null}],
+    shifts:newShifts,
     note:notiz,
     taetigkeiten:taetigkeiten||''
   };
