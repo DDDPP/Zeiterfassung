@@ -192,14 +192,6 @@
       </div>
     </div>
     <div id="eShifts"></div>
-    <div class="fgroup">
-      <label class="flabel">Projekt</label>
-      <input type="text" class="finput" id="eNote" placeholder="z.B. Kunde Müller">
-    </div>
-    <div class="fgroup">
-      <label class="flabel">Tätigkeiten</label>
-      <input type="text" class="finput" id="eTaetigkeiten" placeholder="z.B. Rasenmähen, Bepflanzung">
-    </div>
     <div class="mactions">
       <button class="btn-secondary" onclick="closeModal()">Abbrechen</button>
       <button class="btn-primary" onclick="saveEntry()">Speichern</button>
@@ -801,8 +793,6 @@ function openEditModal(idx){
   document.getElementById('eDate').value=e.date;
   editShifts=(e.shifts&&e.shifts.length)?e.shifts.map(s=>({...s})):[{start:null,end:null,pause:null,net:null,location:null}];
   renderShiftFields();
-  document.getElementById('eNote').value=e.note||'';
-  document.getElementById('eTaetigkeiten').value=e.taetigkeiten||'';
   updateCalcDisplay();
   document.getElementById('editModal').classList.remove('hidden');
 }
@@ -819,8 +809,6 @@ function openAddModal(){
   document.getElementById('eDate').value=new Date().toISOString().split('T')[0];
   editShifts=[{start:null,end:null,pause:null,net:null,location:null}];
   renderShiftFields();
-  document.getElementById('eNote').value='';
-  document.getElementById('eTaetigkeiten').value='';
   updateCalcDisplay();
   document.getElementById('editModal').classList.remove('hidden');
 }
@@ -921,12 +909,14 @@ function saveEntry(){
     newShifts.push({start:s||null, end:en||null, pause:calc?calc.pauseMins:null, net:calc?calc.netMins:null, location:editShifts[i].location||null});
   }
   const heute = new Date().toISOString().split('T')[0];
-  let notiz = document.getElementById('eNote').value;
-  if (dateVal !== heute) {
+  // Projekt/Tätigkeiten werden hier nicht mehr erfasst; bestehende Werte älterer Einträge bleiben unverändert
+  const alt = editIdx!==null ? entries[editIdx] : null;
+  let notiz = alt?.note || '';
+  if (dateVal !== heute && !notiz.includes('Nachgetragen am')) {
     const vermerk = `⚠️ Nachgetragen am ${new Date().toLocaleDateString('de-DE')}`;
     notiz = notiz ? `${notiz} | ${vermerk}` : vermerk;
   }
-  const taetigkeiten=document.getElementById('eTaetigkeiten').value.trim();
+  const taetigkeiten = alt?.taetigkeiten || '';
   const entry={
     id:editIdx!==null?entries[editIdx].id:Date.now(),
     name:document.getElementById('eName').value,
