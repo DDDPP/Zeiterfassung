@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Projektreport – Garten Hoch 3</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Report">
+<meta name="theme-color" content="#2D6A2D">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="180x180" href="apple-touch-icon.png">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  :root {
+    --bg:#F7F8FA; --surface:#fff; --border:#E4E7EC; --text:#111827; --muted:#6B7280;
+    --green:#16A34A; --green-light:#DCFCE7; --red:#DC2626; --red-light:#FEE2E2;
+    --blue:#2563EB; --blue-light:#DBEAFE; --orange:#EA580C; --orange-light:#FEF0E7;
+    --purple:#7C3AED; --purple-light:#EDE9FE; --radius:14px;
+    --shadow:0 1px 4px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.06);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:0 0 48px}
+  .header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 20px 14px;position:sticky;top:0;z-index:10}
+  .header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .logo img{height:34px;width:auto;display:block}
+  .header-title{font-size:15px;font-weight:700}
+  .main{padding:16px 16px 0;max-width:960px;margin:0 auto}
+  .form-card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);border:1.5px solid var(--border);padding:18px;margin-bottom:14px}
+  .card-title{font-size:14px;font-weight:700;margin-bottom:3px;display:flex;align-items:center;gap:6px}
+  .card-sub{font-size:12px;color:var(--muted);margin-bottom:14px}
+  .fgroup{margin-bottom:13px}
+  .fgroup:last-child{margin-bottom:0}
+  .flabel{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:.05em}
+  .finput{width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--text)}
+  .finput:focus{outline:none;border-color:var(--blue)}
+  select.finput{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;cursor:pointer}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .chip-group{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{padding:8px 13px;border-radius:999px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:background .1s,color .1s}
+  .chip.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .btn-primary{width:100%;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:11px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer}
+  .btn-primary:disabled{opacity:.5;cursor:not-allowed}
+  .btn-secondary{padding:10px 14px;background:var(--surface);color:var(--text);border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#111;color:#fff;padding:11px 18px;border-radius:999px;font-size:13px;font-weight:500;z-index:200;transition:transform .3s ease;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}
+  .toast.show{transform:translateX(-50%) translateY(0)}
+
+  /* ── Report ── */
+  .rp-head{margin-bottom:16px}
+  .rp-head h1{font-size:22px;font-weight:700;line-height:1.2}
+  .rp-head .rp-meta{font-size:13px;color:var(--muted);margin-top:4px;line-height:1.5}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px}
+  .tile{background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:12px 14px}
+  .tile-val{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+  .tile-lbl{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+  .note{font-size:12px;border-radius:10px;padding:9px 12px;margin-bottom:10px;line-height:1.45}
+  .note.warn{background:var(--orange-light);color:#9A3412}
+  .note.info{background:var(--blue-light);color:#1E40AF}
+  .section-title{font-size:15px;font-weight:700;margin:22px 0 10px}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .rp-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px}
+  .rp-card h3{font-size:13px;font-weight:700;margin-bottom:8px}
+  table.t{width:100%;border-collapse:collapse;font-size:13px}
+  table.t th{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;text-align:left;padding:5px 6px;border-bottom:1.5px solid var(--border)}
+  table.t td{padding:6px;border-bottom:1px solid var(--border);vertical-align:top}
+  table.t tr:last-child td{border-bottom:none}
+  table.t .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  table.t tfoot td{font-weight:700;border-top:1.5px solid var(--border);border-bottom:none}
+  .bar{height:5px;border-radius:3px;background:var(--blue-light);margin-top:4px}
+  .bar>i{display:block;height:100%;border-radius:3px;background:var(--blue)}
+  .day{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:12px}
+  .day-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px}
+  .day-title{font-size:14px;font-weight:700}
+  .day-sum{font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
+  .bericht{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--bg);border:1px solid var(--border);font-size:13px;line-height:1.5;break-inside:avoid}
+  .bericht-head{font-size:12px;font-weight:700;margin-bottom:5px}
+  .bericht .lbl{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:6px}
+  .bericht .txt{white-space:pre-line}
+  .bericht a{color:var(--blue);text-decoration:none;font-weight:600;margin-right:10px}
+  .empty{font-size:13px;color:var(--muted);padding:6px 0}
+  .loading{text-align:center;color:var(--muted);font-size:13px;padding:30px 0}
+
+  @media (max-width:640px){
+    .cols{grid-template-columns:1fr}
+    .day-head{flex-direction:column;gap:2px}
+  }
+  @media print{
+    @page{size:A4;margin:14mm 12mm}
+    body{background:#fff;padding:0;font-size:12px}
+    .header,.noprint,.toast{display:none!important}
+    .tiles{grid-template-columns:repeat(5,1fr);gap:6px}
+    .tile{padding:8px 9px}
+    .tile-lbl{font-size:9px;letter-spacing:0;overflow-wrap:anywhere}
+    .main{max-width:none;padding:0}
+    .tile,.rp-card,.day{box-shadow:none}
+    .day{break-inside:auto}
+    .day-head{break-after:avoid}
+    table.t tr,.bericht{break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+
+<div class="header noprint">
+  <div class="header-top">
+    <div class="logo"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAATUAAABQCAYAAAB4UeJZAABO7UlEQVR42u19d3hd1ZX22ufce19XtVzoPYkNBLBwt5FIIIFAhklGCpkwZEhmTBIg4Aqk8PRS6aaEOplk0n4zkdImBYKBSOAq+cmU2CaYQIyNcZGs9uot5+zfH/ddWzYusjEQmLe/z5/5hPzKueesvffaa+8DlK1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyvYWmVFehrKVrWzvFRPRaLSu9N9UXo6yla1s73pQY2ZRXoayla1s7xlQKy9B2cpWtveSHTKflkwmRUvLBOroWEsA0NAATZTS5SUtW9nK9o5aJBI5svSfI+bUmJN7jfBaW5tkeUXLVrayvZNGkUjkyEKhsLkEanyg3w9+Z+nS+ScalvlR05LjPWX39PcU/uejH/3eX5hbJbCWy1Fb2cpWtr9rUGMGEYGZk2J5Z+aLhmHMsyzj+GjMBAgoFlwUcs6cKZNuvyuI5srAVraylW1/lkwmRUODz+03NEzgXXRWShEdMMh6s6CWFI8+2mdWVhs3mpZxvZAiLATBdXUGYBOs1xuGMcY0xaMbNw/cetH5D7zAzEREXH50ZXszxpwUbW3rqLm5TZVX471hra1Nsqlp/H4zukPFD2OkH4AopZaumHNRKGItYEZICAHHsVcppZ7Xmn8+c+o9jz/99NxTakZHXzz26JpPLVkx7zIi+lVra5Msb8ayval0orTxmZOiowOisTHlHRo4+rzxoUYAZTs8kVlLSwsTkQKAR9uvPC4Rjp5HRGdBUMKUIq+UXrFpw8afEZETZIiHNVLzN0KrePTRJUbduGhHKCSnePyuhe+OhFtH0+bOsV0baajcN6bZj6x0E7rq7/vANXYU8q5XnlhfvFAkDxQl6bvP3YfYkPbNI0rdHV5L8BUQEAnkCzP7T2esPYG6Zel/btTJt0u7m4BASQmgd5QFKJlIxvIkdKkDWQTqOoujE2aYvdcAECBSQfFLFHEYFLUVgjgASXEAI1d7K7RKUQ2ASZc5oANHaJRrWjb0XtWApMAgBLJIBjFZ74FQnOGbhAl6x7EBLJmKGbQ1oOEbJzAF5cC7y0HgBMHmyKjg1PB0IkWm19ELJEHBdZE6IAFKLJgQH7Q7cggWwBAAoSaV0tLIQYiAGG3RjVhD2DsV4C1YR6+X7T02P98JTwUDNv9j6bRHCt+LR2mvKkj2sST7MJv+Vr9z7mRMTPqj71mJEFNxKEYBN9cJoMBOuFI6NjDfv3D3sOmQBXWDaT3JOPAklVUGpnJk1ib09C3VRlvPagdYC7WT3Cjnce+NM9MNAA==" alt="Garten Hoch 3"></div>
+  </div>
+  <div class="header-title">📊 Projektreport</div>
+</div>
+
+<div class="main">
+  <br class="noprint">
+
+  <div class="form-card noprint" id="tokenError" style="display:none;border-color:var(--red)">
+    <div class="card-title" style="color:var(--red)">⚠️ Ungültiger Zugang</div>
+    <div class="card-sub">Bitte den vollständigen Link mit Zugangscode verwenden.</div>
+  </div>
+
+  <div class="form-card noprint" id="filterCard">
+    <div class="fgroup">
+      <label class="flabel">Projekt</label>
+      <select class="finput" id="projekt"><option value="">– auswählen –</option></select>
+    </div>
+    <div class="fgroup">
+      <label class="flabel">Zeitraum</label>
+      <div class="chip-group" id="zrChips"></div>
+    </div>
+    <div class="fgroup grid2">
+      <div>
+        <label class="flabel">Von</label>
+        <input type="date" class="finput" id="von">
+      </div>
+      <div>
+        <label class="flabel">Bis</label>
+        <input type="date" class="finput" id="bis">
+      </div>
+    </div>
+    <button class="btn-primary" id="goBtn" onclick="erstelleReport()">📊 Report erstellen</button>
+  </div>
+
+  <div id="status"></div>
+
+  <div id="reportWrap" style="display:none">
+    <div class="toolbar noprint">
+      <button class="btn-secondary" onclick="druckeReport()">🖨️ Drucken / als PDF speichern</button>
+      <button class="btn-secondary" onclick="exportLeistungenCsv()">⬇️ CSV Leistungen</button>
+      <button class="btn-secondary" onclick="exportBerichteCsv()">⬇️ CSV Baustellenberichte</button>
+    </div>
+    <div id="report"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const WEBHOOK_BASE = 'https://script.google.com/macros/s/AKfycbw1AOqcgtunqJpDKU59VTJkn5TWr1xMip90EA5iOYf-FdcOASCcocZRMqO4IRPicCZf/exec';
+const TOKEN = new URLSearchParams(window.location.search).get('token') || '';
+const WOCHENTAGE = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+const GRUPPEN_LABEL = { g1:'Gruppe 1 – Bohren/Sägen/Pumpe', g2:'Gruppe 2 – Rütteln/Schneiden', g3:'Gruppe 3 – Mähen/Sägen', g4:'Gruppe 4 – Bagger', g5:'Gruppe 5 – Weitere' };
+const PROJ_CACHE_KEY = 'gh3_rp_projekte_cache';
+const LAST_PROJEKT_KEY = 'gh3_rp_lastProjekt';
+
+let report = null;   // { projekt, von, bis, leist, beric, erstellt }
+
+// ── HILFSFUNKTIONEN ───────────────────────────────────────────────────────────
+function esc(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+let toastT;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2800);
+}
+const pad = n => String(n).padStart(2, '0');
+function isoLokal(d){ return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()); }
+function tagVon(iso){ const [y,m,d] = iso.split('-').map(Number); return new Date(y, m-1, d); }
+function addTage(d, n){ const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+function fmtDatum(iso){ return iso ? iso.slice(8,10) + '.' + iso.slice(5,7) + '.' + iso.slice(0,4) : ''; }
+function fmtTag(iso){ return WOCHENTAGE[tagVon(iso).getDay()] + ', ' + fmtDatum(iso); }
+function fmtZahl(n, stellen){ return Number(n).toLocaleString('de-DE', { minimumFractionDigits: stellen, maximumFractionDigits: stellen }); }
+function fmtStd(min){ return fmtZahl(min / 60, 2); }
+function fmtZeitraum(von, bis){
+  if(!von && !bis) return 'gesamter Zeitraum';
+  if(von && !bis) return 'ab ' + fmtDatum(von);
+  if(!von && bis) return 'bis ' + fmtDatum(bis);
+  return von === bis ? fmtDatum(von) : fmtDatum(von) + ' – ' + fmtDatum(bis);
+}
+
+// ── ZEITRAUM-SCHNELLAUSWAHL ───────────────────────────────────────────────────
+const ZEITRAEUME = [
+  { id:'woche',  label:'Diese Woche',   calc: () => { const h = new Date(), mo = addTage(h, -((h.getDay()+6)%7)); return [mo, addTage(mo, 6)]; } },
+  { id:'lwoche', label:'Letzte Woche',  calc: () => { const h = new Date(), mo = addTage(h, -((h.getDay()+6)%7) - 7); return [mo, addTage(mo, 6)]; } },
+  { id:'monat',  label:'Dieser Monat',  calc: () => { const h = new Date(); return [new Date(h.getFullYear(), h.getMonth(), 1), new Date(h.getFullYear(), h.getMonth()+1, 0)]; } },
+  { id:'lmonat', label:'Letzter Monat', calc: () => { const h = new Date(); return [new Date(h.getFullYear(), h.getMonth()-1, 1), new Date(h.getFullYear(), h.getMonth(), 0)]; } },
+  { id:'alles',  label:'Gesamt',        calc: () => [null, null] }
+];
+let aktiverZeitraum = null;
+function renderZrChips(){
+  document.getElementById('zrChips').innerHTML = ZEITRAEUME.map(z =>
+    `<button type="button" class="chip ${z.id===aktiverZeitraum?'active':''}" onclick="waehleZeitraum('${z.id}')">${z.label}</button>`
+  ).join('');
+}
+function waehleZeitraum(id){
+  const z = ZEITRAEUME.find(x => x.id === id);
+  const [von, bis] = z.calc();
+  document.getElementById('von').value = von ? isoLokal(von) : '';
+  document.getElementById('bis').value = bis ? isoLokal(bis) : '';
+  aktiverZeitraum = id;
+  renderZrChips();
+}
+['von','bis'].forEach(id => document.getElementById(id).addEventListener('input', () => { aktiverZeitraum = null; renderZrChips(); }));
+
+// ── PROJEKTE ──────────────────────────────────────────────────────────────────
+function fuelleProjekte(liste){
+  const az = [...new Set((liste || []).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de', { sensitivity: 'base', numeric: true }));
+  const sel = document.getElementById('projekt');
+  const vorher = sel.value;
+  sel.innerHTML = '<option value="">– auswählen –</option>' + az.map(n => `<option>${esc(n)}</option>`).join('');
+  let wunsch = vorher;
+  if(!wunsch){ try{ wunsch = localStorage.getItem(LAST_PROJEKT_KEY) || ''; }catch(e){} }
+  if(wunsch && az.includes(wunsch)) sel.value = wunsch;
+}
+async function ladeProjekte(){
+  try{
+    const cached = JSON.parse(localStorage.getItem(PROJ_CACHE_KEY) || 'null');
+    if(Array.isArray(cached)) fuelleProjekte(cached);
+  }catch(e){}
+  try{
+    const res = await fetch(WEBHOOK_BASE + '?action=projekte');
+    const data = await res.json();
+    const liste = data.projekte || [];
+    try{ localStorage.setItem(PROJ_CACHE_KEY, JSON.stringify(liste)); }catch(e){}
+    fuelleProjekte(liste);
+  }catch(e){ console.warn('Projektliste konnte nicht geladen werden:', e); showToast('⚠️ Projektliste nicht geladen'); }
+}
+
+// ── REPORT LADEN ──────────────────────────────────────────────────────────────
+async function erstelleReport(){
+  const projekt = document.getElementById('projekt').value;
+  const von = document.getElementById('von').value;
+  const bis = document.getElementById('bis').value;
+  if(!projekt){ showToast('⚠️ Bitte ein Projekt auswählen'); return; }
+  if(von && bis && von > bis){ showToast('⚠️ „Von" liegt nach „Bis"'); return; }
+  try{ localStorage.setItem(LAST_PROJEKT_KEY, projekt); }catch(e){}
+
+  const btn = document.getElementById('goBtn');
+  btn.disabled = true;
+  document.getElementById('reportWrap').style.display = 'none';
+  document.getElementById('status').innerHTML = '<div class="loading">⏳ Report wird erstellt …</div>';
+
+  const ctrl = new AbortController();
+  const timeout = setTimeout(() => ctrl.abort(), 60000);
+  try{
+    const url = WEBHOOK_BASE + '?action=projekt_report&token=' + encodeURIComponent(TOKEN) +
+      '&projekt=' + encodeURIComponent(projekt) + '&von=' + encodeURIComponent(von) + '&bis=' + encodeURIComponent(bis);
+    const res = await fetch(url, { signal: ctrl.signal });
+    const data = await res.json();
+    if(data.status !== 'ok') throw new Error(data.message || 'Unbekannter Fehler');
+    report = {
+      projekt, von, bis,
+      leist: data.leistungen || [],
+      beric: data.berichte || [],
+      hinweise: data.hinweise || [],
+      erstellt: new Date()
+    };
+    document.getElementById('status').innerHTML = '';
+    renderReport();
+    document.getElementById('reportWrap').style.display = '';
+    document.getElementById('reportWrap').scrollIntoView({ behavior:'smooth', block:'start' });
+  }catch(e){
+    const msg = e.name === 'AbortError' ? 'Zeitüberschreitung – bitte erneut versuchen.' : e.message;
+    document.getElementById('status').innerHTML = `<div class="note warn">⚠️ Report konnte nicht erstellt werden: ${esc(msg)}</div>`;
+  }finally{
+    clearTimeout(timeout);
+    btn.disabled = false;
+  }
+}
+
+// ── AUSWERTUNG ────────────────────────────────────────────────────────────────
+function katGruppe(k){ return String(k || '').split(':')[0].trim() || '–'; }
+function summiere(liste, schluessel){
+  const m = new Map();
+  liste.forEach(l => m.set(schluessel(l), (m.get(schluessel(l)) || 0) + l.dauerMin));
+  return [...m.entries()].sort((a, b) => b[1] - a[1]);
+}
+function berechne(r){
+  const leist = r.leist.map(l => Object.assign({}, l, { tag: String(l.start).slice(0, 10) }));
+  const fertig = leist.filter(l => !l.offen);
+  const gesamtMin = fertig.reduce((s, l) => s + l.dauerMin, 0);
+  const maschinen = {};
+  let maschinenStd = 0;
+  r.beric.forEach(b => Object.keys(b.gruppen || {}).forEach(k => {
+    const s = Number(b.gruppen[k].stunden) || 0;
+    maschinen[k] = (maschinen[k] || 0) + s; maschinenStd += s;
+  }));
+  const tage = [...new Set([...leist.map(l => l.tag), ...r.beric.map(b => b.datum)])].filter(Boolean).sort();
+  const tageMitLeistung = new Set(leist.map(l => l.tag));
+  const tageMitBericht = new Set(r.beric.map(b => b.datum));
+  return {
+    leist, fertig, gesamtMin, maschinen, maschinenStd, tage,
+    jeMa: summiere(fertig, l => l.mitarbeiter || '–'),
+    jeKat: summiere(fertig, l => katGruppe(l.kategorie)),
+    offen: leist.filter(l => l.offen).length,
+    ohneBericht: [...tageMitLeistung].filter(t => !tageMitBericht.has(t)).sort(),
+    maCount: new Set(fertig.map(l => l.mitarbeiter)).size
+  };
+}
+
+// ── DARSTELLUNG ───────────────────────────────────────────────────────────────
+function renderBalken(titel, zeilen, gesamt){
+  if(!zeilen.length) return `<div class="rp-card"><h3>${titel}</h3><div class="empty">Keine Leistungen erfasst.</div></div>`;
+  return `<div class="rp-card"><h3>${titel}</h3><table class="t"><tbody>` +
+    zeilen.map(([name, min]) => `<tr><td>${esc(name)}<div class="bar"><i style="width:${gesamt ? Math.round(min / gesamt * 100) : 0}%"></i></div></td><td class="num">${fmtStd(min)} Std.</td></tr>`).join('') +
+    `</tbody></table></div>`;
+}
+
+function renderBericht(b){
+  const zeilen = [];
+  const gruppen = Object.keys(b.gruppen || {}).sort().map(k => {
+    const g = b.gruppen[k];
+    const std = Number(g.stunden) ? fmtZahl(g.stunden, 2) + ' Std.' : '';
+    return `<div>${esc(GRUPPEN_LABEL[k] || k)}${std ? ': <b>' + std + '</b>' : ''}${g.was ? ' – ' + esc(g.was) : ''}</div>`;
+  });
+  if(gruppen.length) zeilen.push(`<div class="lbl">🔧 Maschineneinsatz</div>${gruppen.join('')}`);
+  if(b.fahrten) zeilen.push(`<div class="lbl">🚐 Fahrten</div><div class="txt">${esc(b.fahrten)}</div>`);
+  if(b.belege) zeilen.push(`<div class="lbl">🧾 Belege</div><div class="txt">${esc(b.belege)}</div>`);
+  const fotos = (b.fotos || []).filter(u => /^https?:\/\//i.test(u));
+  if(fotos.length) zeilen.push(`<div class="lbl">📷 Fotos</div><div>${fotos.map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">Foto ${i+1}</a>`).join('')}</div>`);
+  if(b.notizen) zeilen.push(`<div class="lbl">📝 Bemerkungen</div><div class="txt">${esc(b.notizen)}</div>`);
+  return `<div class="bericht"><div class="bericht-head">🚧 Baustellenbericht${b.erfasstVon ? ' · erfasst von ' + esc(b.erfasstVon) : ''}</div>` +
+    (zeilen.length ? zeilen.join('') : '<div class="empty">Ohne weitere Angaben.</div>') + `</div>`;
+}
+
+function renderTag(tag, a){
+  const le = a.leist.filter(l => l.tag === tag);
+  const be = report.beric.filter(b => b.datum === tag);
+  const min = le.filter(l => !l.offen).reduce((s, l) => s + l.dauerMin, 0);
+  const tabelle = le.length ? `
+    <table class="t">
+      <thead><tr><th>Mitarbeiter</th><th>Tätigkeit</th><th>Zeit</th><th class="num">Dauer</th></tr></thead>
+      <tbody>${le.map(l => `<tr>
+        <td>${esc(l.mitarbeiter)}</td>
+        <td>${esc(l.kategorie)}</td>
+        <td>${esc(String(l.start).slice(11))} – ${l.offen ? '<i>offen</i>' : esc(String(l.ende).slice(11))}</td>
+        <td class="num">${l.offen ? '–' : fmtStd(l.dauerMin) + ' Std.'}</td></tr>`).join('')}</tbody>
+    </table>` : '<div class="empty">Keine Leistungen erfasst.</div>';
+  return `<div class="day">
+    <div class="day-head"><div class="day-title">${fmtTag(tag)}</div><div class="day-sum">${le.length ? fmtStd(min) + ' Std. Personenzeit' : ''}</div></div>
+    ${tabelle}${be.map(renderBericht).join('')}</div>`;
+}
+
+function renderReport(){
+  const r = report, a = berechne(r);
+  r.auswertung = a;
+  const hatDaten = a.tage.length > 0;
+  let html = `
+    <div class="rp-head">
+      <h1>Projektreport: ${esc(r.projekt)}</h1>
+      <div class="rp-meta">Zeitraum: <b>${esc(fmtZeitraum(r.von, r.bis))}</b><br>
+        Erstellt am ${fmtDatum(isoLokal(r.erstellt))} um ${pad(r.erstellt.getHours())}:${pad(r.erstellt.getMinutes())} Uhr</div>
+    </div>`;
+
+  if(!hatDaten){
+    return void (document.getElementById('report').innerHTML = html +
+      '<div class="rp-card"><div class="empty">Für dieses Projekt liegen im gewählten Zeitraum keine Leistungen oder Baustellenberichte vor.</div></div>');
+  }
+
+  html += `<div class="tiles">
+      <div class="tile"><div class="tile-val">${fmtStd(a.gesamtMin)}</div><div class="tile-lbl">Personenstunden</div></div>
+      <div class="tile"><div class="tile-val">${a.tage.length}</div><div class="tile-lbl">Tage mit Einträgen</div></div>
+      <div class="tile"><div class="tile-val">${a.maCount}</div><div class="tile-lbl">Mitarbeiter</div></div>
+      <div class="tile"><div class="tile-val">${r.beric.length}</div><div class="tile-lbl">Baustellenberichte</div></div>
+      <div class="tile"><div class="tile-val">${fmtZahl(a.maschinenStd, 2)}</div><div class="tile-lbl">Maschinenstunden</div></div>
+    </div>`;
+
+  if(a.offen) html += `<div class="note warn">⚠️ ${a.offen} Leistungsrunde(n) sind noch offen (kein Ende erfasst) und fehlen in den Stunden.</div>`;
+  if(a.ohneBericht.length) html += `<div class="note info">ℹ️ Für ${a.ohneBericht.length === 1 ? 'diesen Tag liegt' : 'diese ' + a.ohneBericht.length + ' Tage liegen'} Leistungen, aber kein Baustellenbericht vor: ${a.ohneBericht.map(fmtDatum).join(', ')}</div>`;
+  (r.hinweise || []).forEach(h => { html += `<div class="note warn">⚠️ ${esc(h)}</div>`; });
+
+  html += `<div class="section-title">Auswertung</div><div class="cols">` +
+    renderBalken('Stunden je Mitarbeiter', a.jeMa, a.gesamtMin) +
+    renderBalken('Stunden je Tätigkeit', a.jeKat, a.gesamtMin) + `</div>`;
+
+  const mk = Object.keys(a.maschinen).filter(k => a.maschinen[k] > 0).sort();
+  if(mk.length){
+    html += `<div class="rp-card"><h3>Maschineneinsatz (laut Baustellenberichten)</h3><table class="t"><tbody>` +
+      mk.map(k => `<tr><td>${esc(GRUPPEN_LABEL[k] || k)}</td><td class="num">${fmtZahl(a.maschinen[k], 2)} Std.</td></tr>`).join('') +
+      `</tbody><tfoot><tr><td>Summe</td><td class="num">${fmtZahl(a.maschinenStd, 2)} Std.</td></tr></tfoot></table></div>`;
+  }
+
+  html += `<div class="section-title">Tagesdetails</div>` + a.tage.map(t => renderTag(t, a)).join('');
+  document.getElementById('report').innerHTML = html;
+}
+
+// ── DRUCK / EXPORT ────────────────────────────────────────────────────────────
+function dateiBasis(){
+  const sauber = s => String(s || '').replace(/[^\wäöüÄÖÜß-]+/g, '_').replace(/^_+|_+$/g, '');
+  const zr = (!report.von && !report.bis) ? 'gesamt' : (report.von || '…') + '_bis_' + (report.bis || '…');
+  return 'Projektreport_' + sauber(report.projekt) + '_' + zr;
+}
+function druckeReport(){
+  if(!report) return;
+  const alt = document.title;
+  document.title = dateiBasis();   // wird von Browsern als Vorschlag für den PDF-Dateinamen verwendet
+  window.addEventListener('afterprint', () => { document.title = alt; }, { once: true });
+  window.print();
+}
+function csvZelle(v){ return '"' + String(v == null ? '' : v).replace(/"/g, '""').replace(/\r?\n/g, ' ') + '"'; }
+function ladeCsv(name, zeilen){
+  const text = '﻿' + zeilen.map(z => z.map(csvZelle).join(';')).join('\r\n');
+  const url = URL.createObjectURL(new Blob([text], { type:'text/csv;charset=utf-8' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+function exportLeistungenCsv(){
+  if(!report) return;
+  const kopf = ['Projekt','Datum','Mitarbeiter','Tätigkeit','Start','Ende','Dauer (Std.)'];
+  const zeilen = report.auswertung.leist.map(l => [report.projekt, fmtDatum(l.tag), l.mitarbeiter, l.kategorie,
+    String(l.start).slice(11), l.offen ? '' : String(l.ende).slice(11), l.offen ? '' : fmtZahl(l.dauerMin / 60, 2)]);
+  ladeCsv(dateiBasis() + '_Leistungen.csv', [kopf, ...zeilen]);
+}
+function exportBerichteCsv(){
+  if(!report) return;
+  const kopf = ['Projekt','Datum','Erfasst von','Gruppe 1 Std.','Gruppe 1','Gruppe 2 Std.','Gruppe 2','Gruppe 3 Std.','Gruppe 3',
+    'Gruppe 4 Std.','Gruppe 4','Gruppe 5 Std.','Gruppe 5','Fahrten','Belege','Fotos','Bemerkungen'];
+  const zeilen = report.beric.map(b => {
+    const g = k => { const x = (b.gruppen || {})[k] || {}; return [x.stunden ? fmtZahl(x.stunden, 2) : '', x.was || '']; };
+    return [report.projekt, fmtDatum(b.datum), b.erfasstVon, ...g('g1'), ...g('g2'), ...g('g3'), ...g('g4'), ...g('g5'),
+      b.fahrten, b.belege, (b.fotos || []).join(' '), b.notizen];
+  });
+  ladeCsv(dateiBasis() + '_Baustellenberichte.csv', [kopf, ...zeilen]);
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+renderZrChips();
+waehleZeitraum('monat');
+if(!TOKEN){
+  document.getElementById('tokenError').style.display = '';
+  document.getElementById('filterCard').style.display = 'none';
+} else {
+  ladeProjekte();
+}
+
+// ── SERVICE WORKER (Auto-Update) ──────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').then(reg => {
+    reg.addEventListener('updatefound', () => {
+      const newWorker = reg.installing;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+          const t = document.getElementById('toast');
+          t.textContent = '🔄 Update verfügbar – tippe zum Aktualisieren';
+          t.classList.add('show');
+          t.style.cursor = 'pointer';
+          t.onclick = () => {
+            newWorker.postMessage({ action: 'skipWaiting' });
+            t.classList.remove('show');
+            t.style.cursor = '';
+            t.onclick = null;
+          };
+        }
+      });
+    });
+  });
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
+  });
+}
+</script>
+</body>
+</html>
