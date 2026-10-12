@@ -23,6 +23,9 @@
 const PR_SHEET_BERICHTE = 'Baustellenberichte';
 const PR_SHEET_LEISTUNG = 'Leistungserfassung';
 
+// Uhrzeiten im Report immer in deutscher Zeit ausgeben – unabhängig von der Zeitzone der Tabelle
+const PR_ZEITZONE = 'Europe/Berlin';
+
 // Mögliche Überschriften je Feld (klein geschrieben, ohne Sonderzeichen vergleichen)
 const PR_LE_SPALTEN = {
   mitarbeiter: ['mitarbeiter', 'name'],
@@ -59,7 +62,7 @@ function projektReportAntwort_(e) {
 function prLeistungen_(ss, projekt, von, bis, hinweise) {
   const sh = ss.getSheetByName(PR_SHEET_LEISTUNG);
   if (!sh) throw new Error('Tab „' + PR_SHEET_LEISTUNG + '" nicht gefunden (PR_SHEET_LEISTUNG anpassen).');
-  const tz = ss.getSpreadsheetTimeZone();
+  const tz = PR_ZEITZONE;
   const lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
   if (lastRow < 2) return [];
   const range = sh.getRange(1, 1, lastRow, lastCol);
