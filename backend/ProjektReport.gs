@@ -12,7 +12,7 @@
 //        REPORT_TOKEN = <langer, zufälliger Code>
 //     Dieser Code ist der Zugang zum Report (?token=… in der Report-URL). Er ist bewusst
 //     getrennt von den Mitarbeiter-Tokens, weil der Report die Stunden aller zeigt.
-//  4. Wenn der Tab mit den Leistungsrunden nicht „Leistungen" heißt: PR_SHEET_LEISTUNG anpassen.
+//  4. Der Tab mit den Leistungsrunden heißt „Leistungserfassung" (PR_SHEET_LEISTUNG). Bei Umbenennung hier anpassen.
 //  5. Bereitstellen → Bereitstellungen verwalten → Stift → Neue Version (NICHT „Neue Bereitstellung").
 //
 // Die Spalten der Leistungsrunden werden über ihre Überschriften gefunden (Reihenfolge egal).
@@ -21,7 +21,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const PR_SHEET_BERICHTE = 'Baustellenberichte';
-const PR_SHEET_LEISTUNG = 'Leistungen';
+const PR_SHEET_LEISTUNG = 'Leistungserfassung';
 
 // Mögliche Überschriften je Feld (klein geschrieben, ohne Sonderzeichen vergleichen)
 const PR_LE_SPALTEN = {
