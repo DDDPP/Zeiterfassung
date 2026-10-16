@@ -81,6 +81,22 @@
   .empty{font-size:13px;color:var(--muted);padding:6px 0}
   .loading{text-align:center;color:var(--muted);font-size:13px;padding:30px 0}
 
+  /* ── Gesamtauszug (alle Projekte) ── */
+  .tscroll{overflow-x:auto}
+  .printonly{display:none}
+  .projlink{background:none;border:none;padding:0;font:inherit;font-weight:600;color:var(--blue);text-align:left;cursor:pointer}
+  .auszug-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:22px 0 10px}
+  .auszug-bar .section-title{margin:0 auto 0 0}
+  details.grp{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);margin-bottom:10px;padding:0 16px}
+  details.grp>summary{display:flex;justify-content:space-between;gap:10px;padding:13px 0;font-size:14px;font-weight:700;cursor:pointer;list-style:none}
+  details.grp>summary::-webkit-details-marker{display:none}
+  details.grp>summary>span:first-child::before{content:'▸ ';color:var(--muted)}
+  details.grp[open]>summary>span:first-child::before{content:'▾ '}
+  details.grp>summary .num{white-space:nowrap;font-variant-numeric:tabular-nums}
+  details.grp>table{margin-bottom:12px}
+  table.t tr.g1 td{font-weight:600;background:var(--bg)}
+  table.t tr.g2 td{padding-left:20px;font-size:12px;color:var(--muted)}
+
   @media (max-width:640px){
     .cols{grid-template-columns:1fr}
     .day-head{flex-direction:column;gap:2px}
@@ -97,6 +113,9 @@
     .day{break-inside:auto}
     .day-head{break-after:avoid}
     table.t tr,.bericht{break-inside:avoid}
+    details.grp{box-shadow:none;break-inside:auto}
+    .printonly{display:inline}
+    .tscroll{overflow:visible}
   }
 </style>
 </head>
@@ -136,6 +155,10 @@
         <input type="date" class="finput" id="bis">
       </div>
     </div>
+    <div class="fgroup">
+      <label class="flabel">Oder Monat wählen</label>
+      <input type="month" class="finput" id="monatWahl">
+    </div>
     <button class="btn-primary" id="goBtn" onclick="erstelleReport()">📊 Report erstellen</button>
   </div>
 
@@ -144,6 +167,7 @@
   <div id="reportWrap" style="display:none">
     <div class="toolbar noprint">
       <button class="btn-secondary" onclick="druckeReport()">🖨️ Drucken / als PDF speichern</button>
+      <button class="btn-secondary" id="btnAuszugCsv" style="display:none" onclick="exportAuszugCsv()">⬇️ CSV Auszug</button>
       <button class="btn-secondary" onclick="exportLeistungenCsv()">⬇️ CSV Leistungen</button>
       <button class="btn-secondary" onclick="exportBerichteCsv()">⬇️ CSV Baustellenberichte</button>
     </div>
@@ -160,8 +184,12 @@ const WOCHENTAGE = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 const GRUPPEN_LABEL = { g1:'Gruppe 1 – Bohren/Sägen/Pumpe', g2:'Gruppe 2 – Rütteln/Schneiden', g3:'Gruppe 3 – Mähen/Sägen', g4:'Gruppe 4 – Bagger', g5:'Gruppe 5 – Weitere' };
 const PROJ_CACHE_KEY = 'gh3_rp_projekte_cache';
 const LAST_PROJEKT_KEY = 'gh3_rp_lastProjekt';
+const ALLE = '__alle__';            // Wert der Auswahl „Alle Projekte"
+const OHNE = 'Ohne Projekt';        // Anzeigename für Leistungen ohne Projekt
+const MONATE = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 
-let report = null;   // { projekt, von, bis, leist, beric, erstellt }
+let report = null;   // { projekt, alle, von, bis, leist, beric, erstellt }
+let ansicht = 'ma';  // Gesamtauszug: 'ma' = nach Mitarbeiter, 'pr' = nach Projekt
 
 // ── HILFSFUNKTIONEN ───────────────────────────────────────────────────────────
 function esc(s){
@@ -211,16 +239,27 @@ function waehleZeitraum(id){
   renderZrChips();
 }
 ['von','bis'].forEach(id => document.getElementById(id).addEventListener('input', () => { aktiverZeitraum = null; renderZrChips(); }));
+// Monat wählen → Von/Bis auf ersten und letzten Tag des Monats setzen
+document.getElementById('monatWahl').addEventListener('change', function(){
+  const m = /^(\d{4})-(\d{2})$/.exec(this.value);
+  if(!m) return;
+  const y = Number(m[1]), mo = Number(m[2]);
+  document.getElementById('von').value = isoLokal(new Date(y, mo - 1, 1));
+  document.getElementById('bis').value = isoLokal(new Date(y, mo, 0));
+  aktiverZeitraum = null; renderZrChips();
+});
 
 // ── PROJEKTE ──────────────────────────────────────────────────────────────────
 function fuelleProjekte(liste){
   const az = [...new Set((liste || []).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de', { sensitivity: 'base', numeric: true }));
   const sel = document.getElementById('projekt');
   const vorher = sel.value;
-  sel.innerHTML = '<option value="">– auswählen –</option>' + az.map(n => `<option>${esc(n)}</option>`).join('');
+  sel.innerHTML = '<option value="">– auswählen –</option>' +
+    `<option value="${ALLE}">📋 Alle Projekte (Gesamtauszug)</option>` +
+    az.map(n => `<option>${esc(n)}</option>`).join('');
   let wunsch = vorher;
   if(!wunsch){ try{ wunsch = localStorage.getItem(LAST_PROJEKT_KEY) || ''; }catch(e){} }
-  if(wunsch && az.includes(wunsch)) sel.value = wunsch;
+  if(wunsch && (wunsch === ALLE || az.includes(wunsch))) sel.value = wunsch;
 }
 async function ladeProjekte(){
   try{
@@ -238,12 +277,14 @@ async function ladeProjekte(){
 
 // ── REPORT LADEN ──────────────────────────────────────────────────────────────
 async function erstelleReport(){
-  const projekt = document.getElementById('projekt').value;
+  const auswahl = document.getElementById('projekt').value;
+  const alle = auswahl === ALLE;
+  const projekt = alle ? 'Alle Projekte' : auswahl;
   const von = document.getElementById('von').value;
   const bis = document.getElementById('bis').value;
-  if(!projekt){ showToast('⚠️ Bitte ein Projekt auswählen'); return; }
+  if(!auswahl){ showToast('⚠️ Bitte ein Projekt auswählen'); return; }
   if(von && bis && von > bis){ showToast('⚠️ „Von" liegt nach „Bis"'); return; }
-  try{ localStorage.setItem(LAST_PROJEKT_KEY, projekt); }catch(e){}
+  try{ localStorage.setItem(LAST_PROJEKT_KEY, auswahl); }catch(e){}
 
   const btn = document.getElementById('goBtn');
   btn.disabled = true;
@@ -254,23 +295,29 @@ async function erstelleReport(){
   const timeout = setTimeout(() => ctrl.abort(), 60000);
   try{
     const url = WEBHOOK_BASE + '?action=projekt_report&token=' + encodeURIComponent(TOKEN) +
-      '&projekt=' + encodeURIComponent(projekt) + '&von=' + encodeURIComponent(von) + '&bis=' + encodeURIComponent(bis);
+      (alle ? '&alle=1' : '&projekt=' + encodeURIComponent(projekt)) +
+      '&von=' + encodeURIComponent(von) + '&bis=' + encodeURIComponent(bis);
     const res = await fetch(url, { signal: ctrl.signal });
     const data = await res.json();
     if(data.status !== 'ok') throw new Error(data.message || 'Unbekannter Fehler');
     report = {
-      projekt, von, bis,
+      projekt, alle, von, bis,
       leist: data.leistungen || [],
       beric: data.berichte || [],
       hinweise: data.hinweise || [],
       erstellt: new Date()
     };
+    if(alle){
+      if(data.alle !== true) throw new Error('Das Backend kennt den Gesamtauszug noch nicht – bitte ProjektReport.gs in Apps Script aktualisieren und neu bereitstellen.');
+      normalisiereProjekte(report.leist, report.beric);
+    }
     document.getElementById('status').innerHTML = '';
     renderReport();
     document.getElementById('reportWrap').style.display = '';
     document.getElementById('reportWrap').scrollIntoView({ behavior:'smooth', block:'start' });
   }catch(e){
-    const msg = e.name === 'AbortError' ? 'Zeitüberschreitung – bitte erneut versuchen.' : e.message;
+    let msg = e.name === 'AbortError' ? 'Zeitüberschreitung – bitte erneut versuchen.' : e.message;
+    if(alle && msg === 'Kein Projekt angegeben.') msg = 'Das Backend kennt den Gesamtauszug noch nicht – bitte ProjektReport.gs in Apps Script aktualisieren und neu bereitstellen.';
     document.getElementById('status').innerHTML = `<div class="note warn">⚠️ Report konnte nicht erstellt werden: ${esc(msg)}</div>`;
   }finally{
     clearTimeout(timeout);
@@ -351,7 +398,155 @@ function renderTag(tag, a){
     ${tabelle}${be.map(renderBericht).join('')}</div>`;
 }
 
+// ── GESAMTAUSZUG (ALLE PROJEKTE) ──────────────────────────────────────────────
+// Leere oder sinngemäß leere Projektangaben → „Ohne Projekt"; Schreibweisen (Groß/Klein) vereinheitlichen
+function normalisiereProjekte(...listen){
+  const gesehen = new Map();
+  const leer = /^(-|–|—|kein projekt|keins|nicht zutreffend|ohne projekt|[–-] kein projekt \/ nicht zutreffend [–-])$/i;
+  listen.forEach(liste => liste.forEach(x => {
+    const roh = String(x.projekt == null ? '' : x.projekt).replace(/\s+/g, ' ').trim();
+    const name = (!roh || leer.test(roh)) ? OHNE : roh;
+    const key = name.toLowerCase();
+    if(!gesehen.has(key)) gesehen.set(key, name);
+    x.projekt = gesehen.get(key);
+  }));
+}
+function gruppiere(liste, keyFn){
+  const m = new Map();
+  liste.forEach(l => {
+    const k = keyFn(l);
+    if(!m.has(k)) m.set(k, { name: k, min: 0, items: [] });
+    const e = m.get(k); e.min += l.dauerMin; e.items.push(l);
+  });
+  return [...m.values()];
+}
+// absteigend nach Stunden; „Ohne Projekt" steht in der Projekt-Ebene immer am Ende
+function sortiereGruppen(arr, projektEbene){
+  return arr.sort((a, b) => {
+    if(projektEbene){ if(a.name === OHNE && b.name !== OHNE) return 1; if(b.name === OHNE && a.name !== OHNE) return -1; }
+    return b.min - a.min || a.name.localeCompare(b.name, 'de');
+  });
+}
+const EBENE = { ma: l => l.mitarbeiter || '–', pr: l => l.projekt, ka: l => katGruppe(l.kategorie) };
+
+function berechneAlle(r){
+  const leist = r.leist.map(l => Object.assign({}, l, { tag: String(l.start).slice(0, 10) }));
+  const fertig = leist.filter(l => !l.offen);
+  const gesamtMin = fertig.reduce((s, l) => s + l.dauerMin, 0);
+  const projekte = new Map();
+  const pe = name => { if(!projekte.has(name)) projekte.set(name, { name, min: 0, ma: new Set(), berichte: 0, maschStd: 0 }); return projekte.get(name); };
+  fertig.forEach(l => { const e = pe(l.projekt); e.min += l.dauerMin; e.ma.add(l.mitarbeiter); });
+  r.beric.forEach(b => {
+    const e = pe(b.projekt); e.berichte++;
+    Object.keys(b.gruppen || {}).forEach(k => { e.maschStd += Number(b.gruppen[k].stunden) || 0; });
+  });
+  const projektListe = sortiereGruppen([...projekte.values()], true);
+  const ohneMin = (projekte.get(OHNE) || { min: 0 }).min;
+  return {
+    leist, fertig, gesamtMin, projektListe, ohneMin,
+    projektAnzahl: projektListe.filter(p => p.name !== OHNE).length,
+    maCount: new Set(fertig.map(l => l.mitarbeiter)).size,
+    offen: leist.filter(l => l.offen).length,
+    jeMa: summiere(fertig, l => l.mitarbeiter || '–'),
+    jeKat: summiere(fertig, l => katGruppe(l.kategorie)),
+    maschStd: projektListe.reduce((s, p) => s + p.maschStd, 0)
+  };
+}
+
+function istGanzerMonat(von, bis){
+  if(!von || !bis || von.slice(0, 7) !== bis.slice(0, 7) || von.slice(8) !== '01') return false;
+  const y = Number(von.slice(0, 4)), m = Number(von.slice(5, 7));
+  return bis === isoLokal(new Date(y, m, 0));
+}
+
+function renderBaum(a){
+  const [e0, e1, e2] = ansicht === 'ma' ? ['ma', 'pr', 'ka'] : ['pr', 'ma', 'ka'];
+  if(!a.fertig.length) return '<div class="rp-card"><div class="empty">Keine abgeschlossenen Leistungen im Zeitraum.</div></div>';
+  return sortiereGruppen(gruppiere(a.fertig, EBENE[e0]), e0 === 'pr').map(g0 => {
+    const zeilen = sortiereGruppen(gruppiere(g0.items, EBENE[e1]), e1 === 'pr').map(g1 =>
+      `<tr class="g1"><td>${esc(g1.name)}</td><td class="num">${fmtStd(g1.min)} Std.</td></tr>` +
+      sortiereGruppen(gruppiere(g1.items, EBENE[e2]), false).map(g2 =>
+        `<tr class="g2"><td>${esc(g2.name)}</td><td class="num">${fmtStd(g2.min)} Std.</td></tr>`).join('')
+    ).join('');
+    return `<details class="grp"><summary><span>${esc(g0.name)}</span><span class="num">${fmtStd(g0.min)} Std.</span></summary>` +
+      `<table class="t"><tbody>${zeilen}</tbody></table></details>`;
+  }).join('');
+}
+function waehleAnsicht(x){
+  ansicht = x;
+  document.getElementById('ansichtChips').innerHTML = ansichtChips();
+  document.getElementById('baum').innerHTML = renderBaum(report.auswertung);
+}
+function ansichtChips(){
+  return [['ma', 'Nach Mitarbeiter'], ['pr', 'Nach Projekt']].map(([id, label]) =>
+    `<button type="button" class="chip ${id === ansicht ? 'active' : ''}" onclick="waehleAnsicht('${id}')">${label}</button>`).join('');
+}
+function klappeAlle(){
+  const d = [...document.querySelectorAll('#baum details')];
+  const auf = d.some(x => !x.open);
+  d.forEach(x => { x.open = auf; });
+}
+function oeffneProjekt(name){
+  const sel = document.getElementById('projekt');
+  if(![...sel.options].some(o => o.value === name)) { showToast('⚠️ Projekt nicht in der Liste'); return; }
+  sel.value = name;
+  erstelleReport();
+}
+
+function renderAlle(){
+  const r = report, a = berechneAlle(r);
+  r.auswertung = a;
+  const monat = istGanzerMonat(r.von, r.bis) ? MONATE[Number(r.von.slice(5, 7)) - 1] + ' ' + r.von.slice(0, 4) : '';
+  document.getElementById('btnAuszugCsv').style.display = '';
+  let html = `
+    <div class="rp-head">
+      <h1>${monat ? 'Monatsauszug ' + esc(monat) : 'Gesamtauszug'}: alle Projekte</h1>
+      <div class="rp-meta">Zeitraum: <b>${esc(fmtZeitraum(r.von, r.bis))}</b><br>
+        Erstellt am ${fmtDatum(isoLokal(r.erstellt))} um ${pad(r.erstellt.getHours())}:${pad(r.erstellt.getMinutes())} Uhr</div>
+    </div>`;
+
+  if(!a.leist.length && !r.beric.length){
+    return void (document.getElementById('report').innerHTML = html +
+      '<div class="rp-card"><div class="empty">Im gewählten Zeitraum liegen keine Leistungen oder Baustellenberichte vor.</div></div>');
+  }
+
+  html += `<div class="tiles">
+      <div class="tile"><div class="tile-val">${fmtStd(a.gesamtMin)}</div><div class="tile-lbl">Personenstunden gesamt</div></div>
+      <div class="tile"><div class="tile-val">${fmtStd(a.ohneMin)}</div><div class="tile-lbl">davon ohne Projekt</div></div>
+      <div class="tile"><div class="tile-val">${a.projektAnzahl}</div><div class="tile-lbl">Projekte</div></div>
+      <div class="tile"><div class="tile-val">${a.maCount}</div><div class="tile-lbl">Mitarbeiter</div></div>
+      <div class="tile"><div class="tile-val">${r.beric.length}</div><div class="tile-lbl">Baustellenberichte</div></div>
+    </div>`;
+
+  if(a.offen) html += `<div class="note warn">⚠️ ${a.offen} Leistungsrunde(n) sind noch offen (kein Ende erfasst) und fehlen in den Stunden.</div>`;
+  (r.hinweise || []).forEach(h => { html += `<div class="note warn">⚠️ ${esc(h)}</div>`; });
+
+  // Übersicht je Projekt
+  html += `<div class="section-title">Übersicht je Projekt</div><div class="rp-card tscroll"><table class="t">
+    <thead><tr><th>Projekt</th><th class="num">Std.</th><th class="num">MA</th><th class="num">Berichte</th><th class="num">Maschinen-Std.</th></tr></thead><tbody>` +
+    a.projektListe.map(p => `<tr>
+      <td>${p.name === OHNE ? '<i>' + esc(OHNE) + '</i>' : `<button type="button" class="projlink noprint" onclick="oeffneProjekt(${esc(JSON.stringify(p.name))})">${esc(p.name)}</button><span class="printonly">${esc(p.name)}</span>`}</td>
+      <td class="num">${fmtStd(p.min)}</td><td class="num">${p.ma.size || '–'}</td>
+      <td class="num">${p.berichte || '–'}</td><td class="num">${p.maschStd ? fmtZahl(p.maschStd, 2) : '–'}</td></tr>`).join('') +
+    `</tbody><tfoot><tr><td>Summe</td><td class="num">${fmtStd(a.gesamtMin)}</td><td class="num">${a.maCount}</td>
+      <td class="num">${r.beric.length}</td><td class="num">${fmtZahl(a.maschStd, 2)}</td></tr></tfoot></table></div>`;
+
+  // Gesamt je Mitarbeiter / Tätigkeit
+  html += `<div class="cols">` +
+    renderBalken('Stunden je Mitarbeiter', a.jeMa, a.gesamtMin) +
+    renderBalken('Stunden je Tätigkeit', a.jeKat, a.gesamtMin) + `</div>`;
+
+  // Aufschlüsselung (umschaltbar)
+  html += `<div class="auszug-bar"><div class="section-title">Aufschlüsselung</div>
+      <button class="btn-secondary noprint" onclick="klappeAlle()">Alles auf-/zuklappen</button></div>
+    <div class="chip-group noprint" id="ansichtChips" style="margin-bottom:12px">${ansichtChips()}</div>
+    <div id="baum">${renderBaum(a)}</div>`;
+  document.getElementById('report').innerHTML = html;
+}
+
 function renderReport(){
+  document.getElementById('btnAuszugCsv').style.display = 'none';
+  if(report.alle) return renderAlle();
   const r = report, a = berechne(r);
   r.auswertung = a;
   const hatDaten = a.tage.length > 0;
@@ -400,6 +595,13 @@ function dateiBasis(){
   const zr = (!report.von && !report.bis) ? 'gesamt' : (report.von || '…') + '_bis_' + (report.bis || '…');
   return 'Projektreport_' + sauber(report.projekt) + '_' + zr;
 }
+// Beim Drucken alle aufklappbaren Bereiche öffnen (zugeklappt würden sie fehlen) und danach wieder zuklappen
+window.addEventListener('beforeprint', () => {
+  document.querySelectorAll('#report details').forEach(d => { if(!d.open){ d.open = true; d.dataset.zu = '1'; } });
+});
+window.addEventListener('afterprint', () => {
+  document.querySelectorAll('#report details[data-zu]').forEach(d => { d.open = false; delete d.dataset.zu; });
+});
 function druckeReport(){
   if(!report) return;
   const alt = document.title;
@@ -418,9 +620,21 @@ function ladeCsv(name, zeilen){
 function exportLeistungenCsv(){
   if(!report) return;
   const kopf = ['Projekt','Datum','Mitarbeiter','Tätigkeit','Start','Ende','Dauer (Std.)'];
-  const zeilen = report.auswertung.leist.map(l => [report.projekt, fmtDatum(l.tag), l.mitarbeiter, l.kategorie,
+  const zeilen = report.auswertung.leist.map(l => [report.alle ? l.projekt : report.projekt, fmtDatum(l.tag), l.mitarbeiter, l.kategorie,
     String(l.start).slice(11), l.offen ? '' : String(l.ende).slice(11), l.offen ? '' : fmtZahl(l.dauerMin / 60, 2)]);
   ladeCsv(dateiBasis() + '_Leistungen.csv', [kopf, ...zeilen]);
+}
+// Gesamtauszug: je Projekt × Mitarbeiter × Tätigkeit eine Zeile mit Stunden (gut für Pivot in Excel)
+function exportAuszugCsv(){
+  if(!report || !report.alle) return;
+  const m = new Map();
+  report.auswertung.fertig.forEach(l => {
+    const k = [l.projekt, l.mitarbeiter || '–', katGruppe(l.kategorie)].join('\u0001');
+    m.set(k, (m.get(k) || 0) + l.dauerMin);
+  });
+  const zeilen = [...m.entries()].map(([k, min]) => [...k.split('\u0001'), fmtZahl(min / 60, 2)])
+    .sort((a, b) => (a[0] === OHNE) - (b[0] === OHNE) || a[0].localeCompare(b[0], 'de') || a[1].localeCompare(b[1], 'de') || a[2].localeCompare(b[2], 'de'));
+  ladeCsv(dateiBasis() + '_Auszug.csv', [['Projekt','Mitarbeiter','Tätigkeit','Stunden'], ...zeilen]);
 }
 function exportBerichteCsv(){
   if(!report) return;
@@ -428,7 +642,7 @@ function exportBerichteCsv(){
     'Gruppe 4 Std.','Gruppe 4','Gruppe 5 Std.','Gruppe 5','Fahrten','Belege','Fotos','Bemerkungen'];
   const zeilen = report.beric.map(b => {
     const g = k => { const x = (b.gruppen || {})[k] || {}; return [x.stunden ? fmtZahl(x.stunden, 2) : '', x.was || '']; };
-    return [report.projekt, fmtDatum(b.datum), b.erfasstVon, ...g('g1'), ...g('g2'), ...g('g3'), ...g('g4'), ...g('g5'),
+    return [report.alle ? b.projekt : report.projekt, fmtDatum(b.datum), b.erfasstVon, ...g('g1'), ...g('g2'), ...g('g3'), ...g('g4'), ...g('g5'),
       b.fahrten, b.belege, (b.fotos || []).join(' '), b.notizen];
   });
   ladeCsv(dateiBasis() + '_Baustellenberichte.csv', [kopf, ...zeilen]);

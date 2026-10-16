@@ -3,6 +3,9 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 // Liefert für ein Projekt und einen Zeitraum alle Leistungsrunden (Leistungserfassung)
 // und alle Baustellenberichte als JSON an die Seite projektreport.html.
+// Mit dem Parameter alle=1 (Gesamtauszug) entfällt der Projektfilter: dann kommen alle
+// Projekte und auch Leistungen ohne Projekt (leere Projekt-Zelle) zurück, jeweils mit
+// dem Feld „projekt". Die Gruppierung und Summen macht die Seite.
 //
 // EINRICHTUNG (einmalig)
 //  1. Diese Datei als neue Skriptdatei „ProjektReport.gs" im Apps-Script-Projekt anlegen.
@@ -42,8 +45,10 @@ function projektReportAntwort_(e) {
     if (!erwartet) return prJson_({ status: 'error', message: 'REPORT_TOKEN ist in den Skripteigenschaften nicht gesetzt.' });
     if (!p.token || p.token !== erwartet) return prJson_({ status: 'error', message: 'Zugang ungültig.' });
 
-    const projekt = prNorm_(p.projekt);
-    if (!projekt) return prJson_({ status: 'error', message: 'Kein Projekt angegeben.' });
+    // alle=1 → Gesamtauszug über alle Projekte (inkl. Leistungen ohne Projekt), ohne Projektfilter
+    const alle = String(p.alle || '') === '1';
+    const projekt = alle ? '' : prNorm_(p.projekt);
+    if (!alle && !projekt) return prJson_({ status: 'error', message: 'Kein Projekt angegeben.' });
     const von = prIsoDatum_(p.von);   // leer = ohne Untergrenze
     const bis = prIsoDatum_(p.bis);   // leer = ohne Obergrenze
 
@@ -52,7 +57,7 @@ function projektReportAntwort_(e) {
     const leistungen = prLeistungen_(ss, projekt, von, bis, hinweise);
     const berichte = prBerichte_(ss, projekt, von, bis, hinweise);
 
-    return prJson_({ status: 'ok', projekt: p.projekt, von: von, bis: bis, leistungen: leistungen, berichte: berichte, hinweise: hinweise });
+    return prJson_({ status: 'ok', alle: alle, projekt: alle ? '' : p.projekt, von: von, bis: bis, leistungen: leistungen, berichte: berichte, hinweise: hinweise });
   } catch (err) {
     return prJson_({ status: 'error', message: String((err && err.message) || err) });
   }
@@ -89,7 +94,8 @@ function prLeistungen_(ss, projekt, von, bis, hinweise) {
   const out = [];
   let ohneZeit = 0;
   for (let r = kopf + 1; r < werte.length; r++) {
-    if (prNorm_(anzeige[r][idx.projekt]).toLowerCase() !== projekt.toLowerCase()) continue;
+    const zeilenProjekt = prNorm_(anzeige[r][idx.projekt]);
+    if (projekt && zeilenProjekt.toLowerCase() !== projekt.toLowerCase()) continue;   // projekt leer = alle Projekte
     const start = prZeit_(werte[r][idx.start], anzeige[r][idx.start], tz);
     const ende = prZeit_(werte[r][idx.ende], anzeige[r][idx.ende], tz);
     if (!start) { ohneZeit++; continue; }
@@ -97,6 +103,7 @@ function prLeistungen_(ss, projekt, von, bis, hinweise) {
     if ((von && tag < von) || (bis && tag > bis)) continue;
     const offen = !ende;
     out.push({
+      projekt: zeilenProjekt,   // leer = Leistung ohne Projekt
       mitarbeiter: String(anzeige[r][idx.mitarbeiter]).trim(),
       kategorie: String(anzeige[r][idx.kategorie]).trim(),
       start: start,
@@ -125,7 +132,7 @@ function prBerichte_(ss, projekt, von, bis, hinweise) {
   const out = [];
   for (let r = 0; r < anzeige.length; r++) {
     const z = anzeige[r];
-    if (prNorm_(z[1]).toLowerCase() !== projekt.toLowerCase()) continue;
+    if (projekt && prNorm_(z[1]).toLowerCase() !== projekt.toLowerCase()) continue;   // projekt leer = alle Projekte
     const datum = prIsoDatum_(z[0]);
     if (!datum) continue;
     if ((von && datum < von) || (bis && datum > bis)) continue;
@@ -138,6 +145,7 @@ function prBerichte_(ss, projekt, von, bis, hinweise) {
     }
     const fotos = (String(z[16]) + ' ' + String(formeln[r][16] || '')).match(/https?:\/\/[^\s,;"')]+/g) || [];
     out.push({
+      projekt: prNorm_(z[1]),
       datum: datum,
       erfasstVon: String(z[2]).trim(),
       zeitstempel: String(z[3]).trim(),
