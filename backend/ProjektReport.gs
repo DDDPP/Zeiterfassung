@@ -29,6 +29,9 @@ const PR_SHEET_LEISTUNG = 'Leistungserfassung';
 // Uhrzeiten im Report immer in deutscher Zeit ausgeben – unabhängig von der Zeitzone der Tabelle
 const PR_ZEITZONE = 'Europe/Berlin';
 
+// Diese Mitarbeiter (Testkonten) erscheinen nie im Report – Groß-/Kleinschreibung egal
+const PR_AUSGESCHLOSSEN = ['Testperson1', 'Testperson2'];
+
 // Mögliche Überschriften je Feld (klein geschrieben, ohne Sonderzeichen vergleichen)
 const PR_LE_SPALTEN = {
   mitarbeiter: ['mitarbeiter', 'name'],
@@ -96,6 +99,7 @@ function prLeistungen_(ss, projekt, von, bis, hinweise) {
   for (let r = kopf + 1; r < werte.length; r++) {
     const zeilenProjekt = prNorm_(anzeige[r][idx.projekt]);
     if (projekt && zeilenProjekt.toLowerCase() !== projekt.toLowerCase()) continue;   // projekt leer = alle Projekte
+    if (prAusgeschlossen_(anzeige[r][idx.mitarbeiter])) continue;
     const start = prZeit_(werte[r][idx.start], anzeige[r][idx.start], tz);
     const ende = prZeit_(werte[r][idx.ende], anzeige[r][idx.ende], tz);
     if (!start) { ohneZeit++; continue; }
@@ -133,6 +137,7 @@ function prBerichte_(ss, projekt, von, bis, hinweise) {
   for (let r = 0; r < anzeige.length; r++) {
     const z = anzeige[r];
     if (projekt && prNorm_(z[1]).toLowerCase() !== projekt.toLowerCase()) continue;   // projekt leer = alle Projekte
+    if (prAusgeschlossen_(z[2])) continue;
     const datum = prIsoDatum_(z[0]);
     if (!datum) continue;
     if ((von && datum < von) || (bis && datum > bis)) continue;
@@ -163,6 +168,10 @@ function prBerichte_(ss, projekt, von, bis, hinweise) {
 // ── HILFSFUNKTIONEN (alle mit Präfix pr, damit nichts mit bestehendem Code kollidiert) ──
 function prJson_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+function prAusgeschlossen_(name) {
+  const n = prNorm_(name).toLowerCase();
+  return PR_AUSGESCHLOSSEN.some(function (x) { return x.toLowerCase() === n; });
 }
 function prNorm_(s) { return String(s == null ? '' : s).replace(/\s+/g, ' ').trim(); }
 function prKopfName_(s) { return prNorm_(s).toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/[^a-z0-9]/g, ''); }
