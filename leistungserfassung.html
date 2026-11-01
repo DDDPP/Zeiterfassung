@@ -56,6 +56,36 @@
   .runde-zeit{font-size:12px;color:var(--muted);text-align:right;white-space:nowrap;margin-left:10px}
   .runde-dauer{font-size:13px;font-weight:700;text-align:right}
   .heute-empty{font-size:12px;color:var(--muted);padding:2px 0}
+  /* Reiter-Leiste */
+  .tabs{display:flex;gap:6px;margin-top:10px}
+  .tab-btn{flex:1;padding:9px 8px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer}
+  .tab-btn.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+  /* Baustellenbericht (zweiter Reiter) – Chips/Buttons nur dort anders dimensioniert */
+  textarea.finput{resize:vertical;min-height:70px;font-family:inherit}
+  .machine-row{margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+  .machine-row:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none}
+  .machine-title{font-size:13px;font-weight:700;margin-bottom:1px}
+  .machine-desc{font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.4}
+  .machine-inputs{display:grid;grid-template-columns:88px 1fr;gap:8px}
+  #tabBericht .chip-group{margin-bottom:4px}
+  #tabBericht .chip{padding:7px 12px;font-size:12px}
+  #tabBericht .btn-secondary{width:auto;padding:10px 16px;font-size:13px;font-weight:600;border-radius:10px}
+  .geraet-row{display:flex;align-items:center;gap:8px;margin-top:8px}
+  .geraet-name{flex:1;font-size:13px;font-weight:600}
+  .geraet-row .finput{width:80px;flex-shrink:0}
+  .sonstiges-row{display:flex;gap:8px;margin-top:10px}
+  .sonstiges-row .finput{flex:1}
+  .fahrt-row{border:1.5px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px}
+  .fahrt-row-top{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+  .fahrt-row-bottom{display:flex;gap:8px;align-items:center}
+  .fahrt-row-bottom input{flex:1}
+  .empty-hint{font-size:12px;color:var(--muted);padding:6px 0 10px}
+  .add-btn{font-size:12px;font-weight:600;color:var(--blue);background:none;border:none;cursor:pointer;padding:2px 0}
+  .ibtn{width:32px;height:32px;flex-shrink:0;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
+  .photo-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .photo-thumb{position:relative;width:64px;height:64px;border-radius:8px;overflow:hidden;border:1.5px solid var(--border)}
+  .photo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .photo-remove{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;border:none;background:rgba(0,0,0,.65);color:#fff;font-size:11px;line-height:18px;cursor:pointer;padding:0}
 </style>
 </head>
 <body>
@@ -64,7 +94,11 @@
   <div class="header-top">
     <div class="logo"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAATUAAABQCAYAAAB4UeJZAABO7UlEQVR42u19d3hd1ZX22ufce19XtVzoPYkNBLBwt5FIIIFAhklGCpkwZEhmTBIg4Aqk8PRS6aaEOplk0n4zkdImBYKBSOAq+cmU2CaYQIyNcZGs9uot5+zfH/ddWzYusjEQmLe/z5/5hPzKueesvffaa+8DlK1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2f6uQY0ZRARmTorlnZkvGoYxz7KM46MxEyCgWHBRyDlzpky6/a4gmisDW7nKVrayvaNGEYnEkYUy5mSOa+ybmecS+fmiYRjzLMs4PhozAQKKBReFnDNnyqTb7wqiuTKwlatsZXunLeL3ew0NE5iZfb/QlanRgLBIeTfeVMHgYAAJIyMDW7nKVra3+//jY1JLzQVoAAAAAElFTkSuQmCC" alt="Garten Hoch 3"></div>
   </div>
-  <div class="header-title">⏱️ Leistungserfassung</div>
+  <div class="header-title">Projekte</div>
+  <div class="tabs">
+    <button type="button" class="tab-btn active" id="tabBtnLeistung" onclick="zeigeTab('leistung')">⏱️ Leistung</button>
+    <button type="button" class="tab-btn" id="tabBtnBericht" onclick="zeigeTab('bericht')">🚧 Baustellenbericht</button>
+  </div>
 </div>
 
 <div class="main">
@@ -82,6 +116,9 @@
       <select class="finput" id="leMa"><option value="">– auswählen –</option></select>
     </div>
   </div>
+
+  <!-- ═══════════ REITER 1: LEISTUNG ═══════════ -->
+  <div id="tabLeistung">
 
   <!-- START-BUTTON (initialer Zustand) -->
   <div class="submit-wrap" id="startWrap">
@@ -145,6 +182,113 @@
     </div>
     <button class="btn-secondary" style="margin-top:8px" onclick="schliesseBearbeiten()">Abbrechen</button>
   </div>
+
+  </div><!-- /tabLeistung -->
+
+  <!-- ═══════════ REITER 2: BAUSTELLENBERICHT ═══════════ -->
+  <div id="tabBericht" style="display:none">
+
+  <!-- PROJEKT, DATUM (wer erfasst, kommt von der Auswahl oben) -->
+  <div class="form-card">
+    <div class="fgroup">
+      <label class="flabel">Projekt / Baustelle</label>
+      <select class="finput" id="bbProjekt"><option value="">– auswählen –</option></select>
+      <input type="text" class="finput" id="bbProjektNeu" placeholder="Neuen Projektnamen eintragen" style="display:none;margin-top:8px">
+    </div>
+    <div class="fgroup">
+      <label class="flabel">Datum</label>
+      <input type="date" class="finput" id="bbDatum">
+    </div>
+  </div>
+
+  <!-- MASCHINENEINSATZ -->
+  <div class="form-card">
+    <div class="card-title">🔧 Maschineneinsatz</div>
+    <div class="card-sub">Stunden je Gruppe eintragen, die genutzt wurden</div>
+
+    <div class="machine-row">
+      <div class="machine-title">Gruppe 1</div>
+      <div class="machine-desc">Bohrmaschine / Stichsäge / Flex / Akkuschrauber / Pumpe</div>
+      <div class="chip-group" id="g1Chips"></div>
+      <div id="g1List"></div>
+      <div class="sonstiges-row">
+        <input type="text" class="finput" id="g1Sonstiges" placeholder="Sonstiges Gerät hinzufügen">
+        <button type="button" class="ibtn" onclick="addSonstiges('g1')">+</button>
+      </div>
+    </div>
+
+    <div class="machine-row">
+      <div class="machine-title">Gruppe 2</div>
+      <div class="machine-desc">Vertikutierer / Freischneider / Puster / Rüttelplatte / Stampfer</div>
+      <div class="chip-group" id="g2Chips"></div>
+      <div id="g2List"></div>
+      <div class="sonstiges-row">
+        <input type="text" class="finput" id="g2Sonstiges" placeholder="Sonstiges Gerät hinzufügen">
+        <button type="button" class="ibtn" onclick="addSonstiges('g2')">+</button>
+      </div>
+    </div>
+
+    <div class="machine-row">
+      <div class="machine-title">Gruppe 3</div>
+      <div class="machine-desc">Rasenmäher / Heckenschere / Motorsäge / Schneidetisch / Kappsäge Fräse / Handkreissäge</div>
+      <div class="chip-group" id="g3Chips"></div>
+      <div id="g3List"></div>
+      <div class="sonstiges-row">
+        <input type="text" class="finput" id="g3Sonstiges" placeholder="Sonstiges Gerät hinzufügen">
+        <button type="button" class="ibtn" onclick="addSonstiges('g3')">+</button>
+      </div>
+    </div>
+
+    <div class="machine-row">
+      <div class="machine-title">Gruppe 4</div>
+      <div class="machine-desc">Bagger</div>
+      <div class="machine-inputs">
+        <input type="number" class="finput" id="g4Std" min="0" step="0.25" placeholder="Std.">
+        <input type="text" class="finput" id="g4Was" placeholder="z.B. Gelb Klaas">
+      </div>
+    </div>
+
+    <div class="machine-row">
+      <div class="machine-title">Gruppe 5</div>
+      <div class="machine-desc">Weitere</div>
+      <div class="machine-inputs">
+        <input type="number" class="finput" id="g5Std" min="0" step="0.25" placeholder="Std.">
+        <input type="text" class="finput" id="g5Was" placeholder="z.B. Häcksler">
+      </div>
+    </div>
+  </div>
+
+  <!-- FAHRTEN -->
+  <div class="form-card">
+    <div class="card-title">🚐 Besorgungs-/Entsorgungsfahrten</div>
+    <div class="card-sub">Bus (B) / Sprinter (S) / Fuso (F) / Anhänger (A)</div>
+    <div id="fahrtenList"></div>
+    <button type="button" class="add-btn" onclick="addFahrt()">+ Fahrt hinzufügen</button>
+  </div>
+
+  <!-- BELEGE -->
+  <div class="form-card">
+    <div class="card-title">🧾 Quittungen, Lieferscheine, Rechnungen</div>
+    <div class="fgroup">
+      <label class="flabel">Anzahl / Was</label>
+      <input type="text" class="finput" id="bbBelege" placeholder="z.B. 2x Lieferschein GESA">
+    </div>
+    <input type="file" accept="image/*" capture="environment" multiple id="fotoInput" style="display:none" onchange="handleFotos(event)">
+    <button type="button" class="btn-secondary" onclick="document.getElementById('fotoInput').click()">📷 Foto hinzufügen</button>
+    <div class="photo-grid" id="fotoGrid"></div>
+  </div>
+
+  <!-- NOTIZEN -->
+  <div class="form-card">
+    <div class="card-title">📝 Bemerkungen &amp; Notizen</div>
+    <textarea class="finput" id="bbNotizen" placeholder="Sonstige Bemerkungen..."></textarea>
+  </div>
+
+  <div class="submit-wrap">
+    <button class="btn-primary" id="bbSubmitBtn" onclick="submitBericht()">✅ Bericht senden</button>
+  </div>
+
+  </div><!-- /tabBericht -->
 
 </div><!-- /main -->
 
@@ -423,7 +567,19 @@ function fuelleProjekte(liste){
     sel.innerHTML = optionsHtml;
     if(vorher && [...sel.options].some(o => o.value === vorher)) sel.value = vorher;   // Auswahl nicht überschreiben
   });
+  // Baustellenbericht: gleiche Projektliste, aber ohne „kein Projekt"; beim ersten Befüllen das zuletzt benutzte Projekt vorwählen
+  const bb = document.getElementById('bbProjekt');
+  if(bb){
+    const vorherBb = bb.value;
+    bb.innerHTML = '<option value="">– auswählen –</option>' + projektOptionen + '<option value="__new__">+ Neues Projekt…</option>';
+    let wunsch = vorherBb;
+    if(!wunsch && !bbProjektVorbelegt){
+      try{ wunsch = localStorage.getItem('gh3_bb_lastProjekt') || ''; }catch(e){}
+    }
+    if(wunsch && [...bb.options].some(o => o.value === wunsch)){ bb.value = wunsch; bbProjektVorbelegt = true; }
+  }
 }
+let bbProjektVorbelegt = false;
 // Neu eingetragenes Projekt sofort in die Liste aufnehmen (alphabetisch einsortiert)
 function merkeNeuesProjekt(name){
   if(!name) return;
@@ -452,6 +608,9 @@ document.getElementById('leProjekt').addEventListener('change', function(){
 });
 document.getElementById('editProjekt').addEventListener('change', function(){
   document.getElementById('editProjektNeu').style.display = this.value === '__new__' ? '' : 'none';
+});
+document.getElementById('bbProjekt').addEventListener('change', function(){
+  document.getElementById('bbProjektNeu').style.display = this.value === '__new__' ? '' : 'none';
 });
 
 // ── BISHERIGE RUNDEN HEUTE ──────────────────────────────────────────────────────
@@ -756,7 +915,228 @@ function updateTimerDisplay(){
   document.getElementById('timerWarnung').style.display = (totalSec > 12*3600) ? '' : 'none';
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// BAUSTELLENBERICHT (zweiter Reiter)
+// Mitarbeiter (aktuellerMA), Projektliste, Zugangscode und Toast teilt er sich mit der Leistungserfassung.
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── REITER ─────────────────────────────────────────────────────────────────────
+function zeigeTab(name){
+  const bericht = (name === 'bericht');
+  document.getElementById('tabLeistung').style.display = bericht ? 'none' : '';
+  document.getElementById('tabBericht').style.display = bericht ? '' : 'none';
+  document.getElementById('tabBtnLeistung').classList.toggle('active', !bericht);
+  document.getElementById('tabBtnBericht').classList.toggle('active', bericht);
+  window.scrollTo(0, 0);
+}
+
+// ── FAHRTEN ────────────────────────────────────────────────────────────────────
+let fahrten = [];
+const FAHRZEUGE = ['Sprinter','Bus','Fuso','Anhänger'];
+
+function addFahrt(){
+  fahrten.push({ datum: heuteLokal(), fahrzeug: 'Sprinter', ziel: '' });
+  renderFahrten();
+}
+function removeFahrt(i){ fahrten.splice(i,1); renderFahrten(); }
+function updateFahrt(i, field, value){ fahrten[i][field] = value; }
+
+function renderFahrten(){
+  const c = document.getElementById('fahrtenList');
+  if(!fahrten.length){ c.innerHTML = '<div class="empty-hint">Keine Fahrten erfasst</div>'; return; }
+  c.innerHTML = fahrten.map((f,i) => `
+    <div class="fahrt-row">
+      <div class="fahrt-row-top">
+        <input type="date" class="finput" value="${esc(f.datum)}" onchange="updateFahrt(${i},'datum',this.value)">
+        <select class="finput" onchange="updateFahrt(${i},'fahrzeug',this.value)">
+          ${FAHRZEUGE.map(v => `<option ${f.fahrzeug===v?'selected':''}>${v}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fahrt-row-bottom">
+        <input type="text" class="finput" placeholder="Anlass/Ziel" value="${esc(f.ziel)}" oninput="updateFahrt(${i},'ziel',this.value)">
+        <button type="button" class="ibtn" onclick="removeFahrt(${i})">🗑</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── FOTOS ──────────────────────────────────────────────────────────────────────
+let fotos = [];
+
+function compressImage(file){
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 1280;
+        let { width, height } = img;
+        if(width > height && width > maxDim){ height = Math.round(height*maxDim/width); width = maxDim; }
+        else if(height > maxDim){ width = Math.round(width*maxDim/height); height = maxDim; }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleFotos(e){
+  const files = Array.from(e.target.files);
+  showToast('📷 Foto wird verarbeitet...');
+  for(const file of files){
+    try{ fotos.push(await compressImage(file)); } catch(err){ console.warn(err); }
+  }
+  renderFotos();
+  e.target.value = '';
+}
+function removeFoto(i){ fotos.splice(i,1); renderFotos(); }
+function renderFotos(){
+  const grid = document.getElementById('fotoGrid');
+  grid.innerHTML = fotos.map((f,i) => `
+    <div class="photo-thumb">
+      <img src="${f}">
+      <button type="button" class="photo-remove" onclick="removeFoto(${i})">×</button>
+    </div>
+  `).join('');
+}
+
+// ── MASCHINEN-GERÄTE (Gruppe 1-3, je Gerät eigene Stunden) ────────────────────
+const GRUPPEN_ITEMS = {
+  g1: ['Bohrmaschine','Stichsäge','Flex','Akkuschrauber','Pumpe'],
+  g2: ['Vertikutierer','Freischneider','Puster','Rüttelplatte','Stampfer'],
+  g3: ['Rasenmäher','Heckenschere','Motorsäge','Schneidetisch','Kappsäge/Fräse','Handkreissäge']
+};
+
+let geraete = { g1: [], g2: [], g3: [] };
+
+function renderGruppe(key){
+  const chipsEl = document.getElementById(key+'Chips');
+  const usedNames = geraete[key].map(g => g.name);
+  const available = GRUPPEN_ITEMS[key].filter(item => !usedNames.includes(item));
+  chipsEl.innerHTML = available.map(item =>
+    `<button type="button" class="chip" onclick="addGeraet('${key}','${item}')">${item}</button>`
+  ).join('');
+
+  const listEl = document.getElementById(key+'List');
+  listEl.innerHTML = geraete[key].map((g,i) => `
+    <div class="geraet-row">
+      <span class="geraet-name">${esc(g.name)}</span>
+      <input type="number" class="finput" min="0" step="0.25" placeholder="Std." value="${g.std===''?'':g.std}" oninput="updateGeraetStd('${key}',${i},this.value)">
+      <button type="button" class="ibtn" onclick="removeGeraet('${key}',${i})">🗑</button>
+    </div>
+  `).join('');
+}
+
+function addGeraet(key, name){
+  geraete[key].push({ name, std: '' });
+  renderGruppe(key);
+}
+function updateGeraetStd(key, i, val){
+  geraete[key][i].std = val;
+}
+function removeGeraet(key, i){
+  geraete[key].splice(i,1);
+  renderGruppe(key);
+}
+function addSonstiges(key){
+  const input = document.getElementById(key+'Sonstiges');
+  const name = input.value.trim();
+  if(!name) return;
+  geraete[key].push({ name, std: '' });
+  input.value = '';
+  renderGruppe(key);
+}
+function getGroupData(key){
+  const items = geraete[key];
+  const stunden = items.reduce((sum,g) => sum + (parseFloat(g.std) || 0), 0);
+  const was = items.map(g => (g.std !== '' && !isNaN(parseFloat(g.std))) ? `${g.name}: ${g.std} Std` : g.name).join(', ');
+  return { stunden, was };
+}
+
+// ── SENDEN ─────────────────────────────────────────────────────────────────────
+// Wie bisher direkt (ohne Warteschlange): Bei einem Netzwerkfehler bleibt das Formular jetzt aber erhalten,
+// statt fälschlich „gespeichert" zu melden und den Bericht zu leeren.
+async function sendeBericht(payload){
+  try{
+    await fetch(WEBHOOK_BASE, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    return true;
+  }catch(e){ console.warn('Fehler beim Senden:', e); return false; }
+}
+
+async function submitBericht(){
+  if(!aktuellerMA){ showToast('⚠️ Bitte oben auswählen, wer du bist'); return; }
+
+  let projekt = document.getElementById('bbProjekt').value;
+  const projektIstNeu = (projekt === '__new__');
+  if(projektIstNeu){ projekt = document.getElementById('bbProjektNeu').value.trim(); }
+  if(!projekt){ showToast('⚠️ Bitte Projekt auswählen oder eintragen'); return; }
+
+  const datum = document.getElementById('bbDatum').value;
+  if(!datum){ showToast('⚠️ Bitte Datum wählen'); return; }
+
+  const gruppen = {};
+  ['g1','g2','g3'].forEach(k => {
+    const { stunden, was } = getGroupData(k);
+    if(stunden || was) gruppen[k] = { stunden, was };
+  });
+  ['g4','g5'].forEach(k => {
+    const std = parseFloat(document.getElementById(k+'Std').value) || 0;
+    const was = document.getElementById(k+'Was').value.trim();
+    if(std || was) gruppen[k] = { stunden: std, was };
+  });
+
+  const payload = {
+    type: 'baustellenbericht',
+    token: TOKEN,
+    date: datum,
+    projekt,
+    erfasstVon: aktuellerMA,
+    gruppen,
+    fahrten,
+    belege: document.getElementById('bbBelege').value.trim(),
+    fotos,
+    notizen: document.getElementById('bbNotizen').value.trim()
+  };
+
+  const btn = document.getElementById('bbSubmitBtn');
+  btn.disabled = true;
+  showToast('⏳ Bericht wird gesendet...');
+  const ok = await sendeBericht(payload);
+  btn.disabled = false;
+  if(!ok){ showToast('⚠️ Senden fehlgeschlagen – bitte Verbindung prüfen und erneut senden'); return; }
+
+  try{ localStorage.setItem('gh3_bb_lastProjekt', projekt); }catch(e){}
+  if(projektIstNeu) merkeNeuesProjekt(projekt);
+
+  showToast('✅ Baustellenbericht gespeichert');
+  resetBerichtForm();
+}
+
+function resetBerichtForm(){
+  document.getElementById('g4Std').value = '';
+  document.getElementById('g5Std').value = '';
+  ['g1','g2','g3'].forEach(k => { geraete[k] = []; renderGruppe(k); document.getElementById(k+'Sonstiges').value = ''; });
+  ['g4','g5'].forEach(k => { document.getElementById(k+'Was').value = ''; });
+  document.getElementById('bbBelege').value = '';
+  document.getElementById('bbNotizen').value = '';
+  fahrten = []; renderFahrten();
+  fotos = []; renderFotos();
+  document.getElementById('bbProjektNeu').value = '';
+  document.getElementById('bbProjektNeu').style.display = 'none';
+  document.getElementById('bbProjekt').value = '';
+  document.getElementById('bbDatum').value = heuteLokal();
+}
+
 // ── INIT ───────────────────────────────────────────────────────────────────────
+document.getElementById('bbDatum').value = heuteLokal();
+['g1','g2','g3'].forEach(renderGruppe);
+renderFahrten();
+if(new URLSearchParams(window.location.search).get('tab') === 'bericht') zeigeTab('bericht');
+
 if(!TOKEN){
   document.getElementById('tokenError').style.display = '';
 } else {
