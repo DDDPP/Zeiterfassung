@@ -1,6 +1,6 @@
 // ── GARTEN HOCH 3 – Service Worker ────────────────────────────────────────────
 // Version hier hochzählen bei jedem Update → löst automatisches Update aus
-const CACHE_VERSION = 'gh3-v43';
+const CACHE_VERSION = 'gh3-v44';
 const CACHE_FILES = [
   './zeiterfassung.html',
   './baustellenbericht.html',
@@ -12,7 +12,9 @@ const CACHE_FILES = [
 // Installation: Dateien cachen
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_VERSION).then(cache => cache.addAll(CACHE_FILES))
+    // cache:'reload' umgeht den Browser-Zwischenspeicher (GitHub Pages liefert bis zu 10 Min. alte Dateien aus),
+    // damit das Update wirklich die neuen Dateien holt und nicht die alten erneut einlagert
+    caches.open(CACHE_VERSION).then(cache => cache.addAll(CACHE_FILES.map(f => new Request(f, { cache: 'reload' }))))
   );
 });
 // Aktivierung: Alten Cache löschen
