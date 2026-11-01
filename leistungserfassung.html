@@ -43,6 +43,12 @@
   .btn-secondary{width:100%;padding:14px;background:var(--bg);color:var(--text);border:1.5px solid var(--border);border-radius:11px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer}
   .timer-display{font-size:44px;font-weight:700;text-align:center;margin:8px 0 4px;letter-spacing:.02em;font-variant-numeric:tabular-nums}
   .timer-label{text-align:center;font-size:13px;color:var(--muted);margin-bottom:6px}
+  /* Projekt-Balken im laufenden Timer: groß und farbig, damit sofort klar ist, auf welchem Projekt es läuft */
+  .projekt-banner{background:#15803D;color:#fff;border-radius:11px;padding:14px 16px;text-align:center;margin-bottom:14px}
+  .projekt-banner-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;opacity:.85}
+  .projekt-banner-name{font-size:24px;font-weight:700;line-height:1.2;margin-top:4px;overflow-wrap:anywhere}
+  .projekt-banner.kein{background:#6B7280}
+  .projekt-banner.kein .projekt-banner-name{display:none}
   .timer-warning{font-size:12px;color:var(--red);text-align:center;margin-top:6px;display:none}
   .timer-actions{display:flex;gap:8px;margin-top:16px}
   .submit-wrap{padding:4px 0 8px}
@@ -140,6 +146,10 @@
 
   <!-- LAUFENDER TIMER -->
   <div class="form-card" id="timerCard" style="display:none">
+    <div class="projekt-banner" id="projektBanner">
+      <div class="projekt-banner-label" id="projektBannerLabel"></div>
+      <div class="projekt-banner-name" id="projektBannerName"></div>
+    </div>
     <div class="timer-label" id="timerKategorieLabel"></div>
     <div class="timer-display" id="timerDisplay">00:00:00</div>
     <div class="timer-warning" id="timerWarnung">⚠️ Läuft seit über 12 Std. – vergessen zu stoppen? Bitte bei Bedarf im Sheet korrigieren.</div>
@@ -897,8 +907,12 @@ function zeigeTimer(){
   document.getElementById('startWrap').style.display = 'none';
   document.getElementById('staleCard').style.display = 'none';
   document.getElementById('timerCard').style.display = '';
-  document.getElementById('timerKategorieLabel').textContent =
-    aktuelleRunde.kategorie + (aktuelleRunde.projekt ? ' · ' + aktuelleRunde.projekt : '');
+  const projekt = (aktuelleRunde.projekt || '').trim();
+  const banner = document.getElementById('projektBanner');
+  banner.classList.toggle('kein', !projekt);
+  document.getElementById('projektBannerLabel').textContent = projekt ? 'Läuft auf Projekt' : 'Kein Projekt ausgewählt';
+  document.getElementById('projektBannerName').textContent = projekt;
+  document.getElementById('timerKategorieLabel').textContent = aktuelleRunde.kategorie;
   document.getElementById('timerWarnung').textContent = '⚠️ Läuft seit über 12 Std. – bitte beenden und die Endzeit angeben.';
   clearInterval(timerInterval);
   updateTimerDisplay();
