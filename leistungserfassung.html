@@ -49,6 +49,14 @@
   .projekt-banner-name{font-size:24px;font-weight:700;line-height:1.2;margin-top:4px;overflow-wrap:anywhere}
   .projekt-banner.kein{background:#C2410C}
   .projekt-banner.kein .projekt-banner-name{display:none}
+  .projekt-banner.kein.nichtnoetig{background:#6B7280}   /* Tätigkeit ohne Projektpflicht: neutral statt Warnfarbe */
+  .finput.hinweis{border-color:var(--orange);box-shadow:0 0 0 3px var(--orange-light)}
+  /* Rückfrage „Kein Projekt ausgewählt" */
+  .modal-overlay{position:fixed;inset:0;background:rgba(17,24,39,.55);display:none;align-items:center;justify-content:center;padding:20px;z-index:300}
+  .modal-box{background:var(--surface);border-radius:var(--radius);padding:22px 20px 20px;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.25)}
+  .modal-title{font-size:17px;font-weight:700;margin-bottom:6px}
+  .modal-text{font-size:14px;color:var(--muted);line-height:1.45;margin-bottom:18px}
+  .modal-box .btn-secondary{margin-top:8px}
   .timer-warning{font-size:12px;color:var(--red);text-align:center;margin-top:6px;display:none}
   .timer-actions{display:flex;gap:8px;margin-top:16px}
   .submit-wrap{padding:4px 0 8px}
@@ -137,7 +145,7 @@
     <div class="chip-group" id="katChips"></div>
     <input type="text" class="finput" id="katSonstigesText" placeholder="Sonstiges: was genau?" style="display:none;margin-top:8px">
     <div class="fgroup" style="margin-top:14px">
-      <label class="flabel">Projekt (optional)</label>
+      <label class="flabel" id="leProjektLabel">Projekt</label>
       <select class="finput" id="leProjekt"><option value="">– kein Projekt / nicht zutreffend –</option></select>
       <input type="text" class="finput" id="leProjektNeu" placeholder="Neuen Projektnamen eintragen" style="display:none;margin-top:8px">
     </div>
@@ -172,7 +180,7 @@
     <div class="chip-group" id="editKatChips"></div>
     <input type="text" class="finput" id="editKatSonstigesText" placeholder="Sonstiges: was genau?" style="display:none;margin-top:8px">
     <div class="fgroup" style="margin-top:14px">
-      <label class="flabel">Projekt (optional)</label>
+      <label class="flabel" id="editProjektLabel">Projekt</label>
       <select class="finput" id="editProjekt"><option value="">– kein Projekt / nicht zutreffend –</option></select>
       <input type="text" class="finput" id="editProjektNeu" placeholder="Neuen Projektnamen eintragen" style="display:none;margin-top:8px">
     </div>
@@ -302,6 +310,16 @@
 
 </div><!-- /main -->
 
+<!-- Rückfrage: kein Projekt ausgewählt -->
+<div class="modal-overlay" id="projektModal">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="projektModalTitel">
+    <div class="modal-title" id="projektModalTitel">Kein Projekt ausgewählt</div>
+    <div class="modal-text" id="projektModalText"></div>
+    <button type="button" class="btn-primary" id="projektModalWaehlen">Projekt auswählen</button>
+    <button type="button" class="btn-secondary" id="projektModalOhne">Ohne Projekt starten</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -310,8 +328,15 @@ const TOKEN = new URLSearchParams(window.location.search).get('token') || '';
 
 const KATEGORIEN = [
   'Rüstzeit','Fahrzeit','Baustellenzeit','Lagerarbeit','Kundenakquise',
-  'Besorgungsfahrt','Entsorgungsfahrt','Maschineninstandhaltung','Sonstiges'
+  'Besorgungsfahrt','Entsorgungsfahrt','Planung','Sonstiges'
 ];
+// Nur bei diesen Tätigkeiten ist „kein Projekt" der Normalfall; bei allen anderen kommt vor dem Start eine Rückfrage
+const OHNE_PROJEKT_OK = ['Lagerarbeit','Kundenakquise'];
+function grundKategorie(k){ return String(k || '').split(':')[0].trim(); }   // „Sonstiges: Text" → „Sonstiges"
+function projektNoetig(k){ const g = grundKategorie(k); return !!g && !OHNE_PROJEKT_OK.includes(g); }
+function aktualisiereProjektLabel(id, kategorie){
+  document.getElementById(id).textContent = (kategorie && !projektNoetig(kategorie)) ? 'Projekt (optional)' : 'Projekt';
+}
 const MAX_RUNDE_MS = 12 * 3600 * 1000;   // wie im Backend (LE_MAX_RUNDE_MIN): länger offen = "alte Runde"
 
 let aktuellerMA = '';
@@ -674,6 +699,7 @@ function waehleKategorie(k){
   ausgewaehlteKategorie = k;
   renderKatChips();
   document.getElementById('katSonstigesText').style.display = (k === 'Sonstiges') ? '' : 'none';
+  aktualisiereProjektLabel('leProjektLabel', k);
 }
 
 // ── RUNDE BEARBEITEN/LÖSCHEN ─────────────────────────────────────────────────────
@@ -695,6 +721,7 @@ function oeffneBearbeiten(id){
     document.getElementById('editKatSonstigesText').value = '';
   }
   renderEditKatChips();
+  aktualisiereProjektLabel('editProjektLabel', editKategorie);
 
   const projektSel = document.getElementById('editProjekt');
   projektSel.value = [...projektSel.options].some(o => o.value === runde.projekt) ? runde.projekt : '';
@@ -723,6 +750,7 @@ function waehleEditKategorie(k){
   editKategorie = k;
   renderEditKatChips();
   document.getElementById('editKatSonstigesText').style.display = (k === 'Sonstiges') ? '' : 'none';
+  aktualisiereProjektLabel('editProjektLabel', k);
 }
 
 function schliesseBearbeiten(){
@@ -782,6 +810,9 @@ function zeigeAuswahl(modus){
   document.getElementById('katSonstigesText').value = '';
   document.getElementById('katSonstigesText').style.display = 'none';
   renderKatChips();
+  ohneProjektOk = false;
+  aktualisiereProjektLabel('leProjektLabel', null);
+  document.getElementById('leProjekt').classList.remove('hinweis');
   // Vorauswahl: zuletzt gewähltes Projekt (Fallback beim Wechsel: Projekt der laufenden Runde)
   let vorauswahl = ladeVorauswahl();
   if(vorauswahl === null && modus === 'wechsel' && aktuelleRunde) vorauswahl = aktuelleRunde.projekt || '';
@@ -810,6 +841,9 @@ function bestaetigeAuswahl(){
   if(projekt === '__new__'){ projekt = document.getElementById('leProjektNeu').value.trim(); projektIstNeu = true; }
 
   if(auswahlModus === 'wechsel' && istVeraltet(aktuelleRunde)){ zeigeVeraltet(); return; }
+  // Rückfrage, wenn für diese Tätigkeit ein Projekt erwartet wird, aber keins gewählt ist
+  if(projektNoetig(kategorie) && !projekt && !ohneProjektOk){ zeigeProjektModal(kategorie); return; }
+  ohneProjektOk = false;
   if(!sperre()) return;
 
   const jetzt = new Date().toISOString();
@@ -826,6 +860,34 @@ function bestaetigeAuswahl(){
   if(projektIstNeu) merkeNeuesProjekt(projekt);
   zeigeTimer();   // sofort – das Senden läuft im Hintergrund
 }
+
+// ── RÜCKFRAGE: KEIN PROJEKT ──────────────────────────────────────────────────────
+// Kein Verbot: „Projekt auswählen" springt zurück ins Projektfeld, „Ohne Projekt …" startet/wechselt trotzdem.
+let ohneProjektOk = false;
+function zeigeProjektModal(kategorie){
+  document.getElementById('projektModalText').textContent = 'Für „' + grundKategorie(kategorie) + '" gehört meist ein Projekt dazu.';
+  document.getElementById('projektModalOhne').textContent = auswahlModus === 'wechsel' ? 'Ohne Projekt wechseln' : 'Ohne Projekt starten';
+  document.getElementById('projektModal').style.display = 'flex';
+  document.getElementById('projektModalWaehlen').focus();
+}
+function schliesseProjektModal(){ document.getElementById('projektModal').style.display = 'none'; }
+function projektModalWaehlen(){
+  schliesseProjektModal();
+  const sel = document.getElementById('leProjekt');
+  sel.classList.add('hinweis');
+  sel.scrollIntoView({ behavior:'smooth', block:'center' });
+  sel.focus();
+}
+function projektModalOhne(){
+  schliesseProjektModal();
+  ohneProjektOk = true;
+  bestaetigeAuswahl();
+}
+document.getElementById('projektModalWaehlen').addEventListener('click', projektModalWaehlen);
+document.getElementById('projektModalOhne').addEventListener('click', projektModalOhne);
+document.getElementById('projektModal').addEventListener('click', e => { if(e.target.id === 'projektModal') projektModalWaehlen(); });   // Tipp daneben = Projekt auswählen
+document.addEventListener('keydown', e => { if(e.key === 'Escape' && document.getElementById('projektModal').style.display !== 'none') projektModalWaehlen(); });
+document.getElementById('leProjekt').addEventListener('change', function(){ this.classList.remove('hinweis'); });
 
 function naechsteRunde(){
   if(!aktuelleRunde){ zeigeAuswahl('start'); return; }
@@ -909,8 +971,10 @@ function zeigeTimer(){
   document.getElementById('timerCard').style.display = '';
   const projekt = (aktuelleRunde.projekt || '').trim();
   const banner = document.getElementById('projektBanner');
+  const egal = !projekt && !projektNoetig(aktuelleRunde.kategorie);   // z. B. Lagerarbeit: kein Projekt ist normal
   banner.classList.toggle('kein', !projekt);
-  document.getElementById('projektBannerLabel').textContent = projekt ? 'Läuft auf Projekt' : 'Kein Projekt ausgewählt';
+  banner.classList.toggle('nichtnoetig', egal);
+  document.getElementById('projektBannerLabel').textContent = projekt ? 'Läuft auf Projekt' : (egal ? 'Kein Projekt (nicht nötig)' : 'Kein Projekt ausgewählt');
   document.getElementById('projektBannerName').textContent = projekt;
   document.getElementById('timerKategorieLabel').textContent = aktuelleRunde.kategorie;
   document.getElementById('timerWarnung').textContent = '⚠️ Läuft seit über 12 Std. – bitte beenden und die Endzeit angeben.';
