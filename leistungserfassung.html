@@ -128,7 +128,7 @@
 
   <!-- START-BUTTON (initialer Zustand) -->
   <div class="submit-wrap" id="startWrap">
-    <button class="btn-primary" id="startBtn" onclick="zeigeAuswahl('start')" disabled>▶️ Runde starten</button>
+    <button class="btn-primary" id="startBtn" onclick="zeigeAuswahl('start')" disabled>▶️ Leistung starten</button>
   </div>
 
   <!-- KATEGORIE/PROJEKT-AUSWAHL -->
@@ -154,21 +154,21 @@
     <div class="timer-display" id="timerDisplay">00:00:00</div>
     <div class="timer-warning" id="timerWarnung">⚠️ Läuft seit über 12 Std. – vergessen zu stoppen? Bitte bei Bedarf im Sheet korrigieren.</div>
     <div class="timer-actions">
-      <button class="btn-secondary" onclick="naechsteRunde()">🔄 Nächste Runde</button>
+      <button class="btn-secondary" onclick="naechsteRunde()">🔄 Nächste Leistung</button>
       <button class="btn-primary" onclick="rundeFertig()">✅ Fertig</button>
     </div>
   </div>
 
   <!-- BISHERIGE RUNDEN HEUTE -->
   <div class="form-card" id="heuteCard" style="display:none">
-    <div class="card-title">📋 Bisherige Runden heute</div>
+    <div class="card-title">📋 Bisherige Leistungen heute</div>
     <div class="card-sub">Zum Bearbeiten oder Löschen antippen</div>
     <div id="heuteListe"></div>
   </div>
 
   <!-- RUNDE BEARBEITEN -->
   <div class="form-card" id="bearbeitenCard" style="display:none">
-    <div class="card-title">✏️ Runde bearbeiten</div>
+    <div class="card-title">✏️ Leistung bearbeiten</div>
     <div class="chip-group" id="editKatChips"></div>
     <input type="text" class="finput" id="editKatSonstigesText" placeholder="Sonstiges: was genau?" style="display:none;margin-top:8px">
     <div class="fgroup" style="margin-top:14px">
@@ -333,7 +333,7 @@ let busy = false;           // kurze Sperre gegen Doppeltipps
     '<div class="sync-status" id="syncStatus" style="display:none"></div>');
   document.getElementById('timerCard').insertAdjacentHTML('afterend', `
     <div class="form-card" id="staleCard" style="display:none;border-color:var(--orange)">
-      <div class="card-title" style="color:var(--orange)">⚠️ Alte Runde noch offen</div>
+      <div class="card-title" style="color:var(--orange)">⚠️ Alte Leistung noch offen</div>
       <div class="card-sub" id="staleInfo"></div>
       <div class="fgroup">
         <label class="flabel">Wann war Schluss?</label>
@@ -760,19 +760,19 @@ function speichereBearbeitung(){
     : r);
   renderRundenHeute(letzteRundenHeute);
   schliesseBearbeiten();
-  showToast('✅ Runde aktualisiert');
+  showToast('✅ Leistung aktualisiert');
 }
 
 function loescheAktuelleRunde(){
   if(!bearbeiteteRunde) return;
-  if(!confirm('Diese Runde wirklich löschen?')) return;
+  if(!confirm('Diese Leistung wirklich löschen?')) return;
   if(!sperre()) return;
   const id = bearbeiteteRunde.id;
   enqueue({ type:'leistung_delete', token: TOKEN, id });
   letzteRundenHeute = letzteRundenHeute.filter(r => r.id !== id);
   renderRundenHeute(letzteRundenHeute);
   schliesseBearbeiten();
-  showToast('🗑 Runde gelöscht');
+  showToast('🗑 Leistung gelöscht');
 }
 
 // ── AUSWAHL-PANEL (Start ODER Wechsel) ──────────────────────────────────────────
@@ -846,7 +846,7 @@ function rundeFertig(){
   document.getElementById('timerCard').style.display = 'none';
   document.getElementById('auswahlCard').style.display = 'none';
   document.getElementById('startWrap').style.display = '';
-  showToast('✅ Runde gespeichert');
+  showToast('✅ Leistung gespeichert');
 }
 
 // ── ALTE (ÜBER 12 STD. OFFENE) RUNDE KLÄREN ──────────────────────────────────
@@ -887,15 +887,15 @@ function staleSpeichern(){
   if(!sperre()) return;
   enqueue({ type:'leistung_update', token: TOKEN, id: aktuelleRunde.id, kategorie: aktuelleRunde.kategorie, projekt: aktuelleRunde.projekt || '', startZeit: aktuelleRunde.start, endZeit: ende.toISOString() });
   beendeAlteRunde();
-  showToast('✅ Runde beendet');
+  showToast('✅ Leistung beendet');
 }
 function staleVerwerfen(){
   if(!aktuelleRunde) return;
-  if(!confirm('Diese Runde wirklich löschen?')) return;
+  if(!confirm('Diese Leistung wirklich löschen?')) return;
   if(!sperre()) return;
   enqueue({ type:'leistung_delete', token: TOKEN, id: aktuelleRunde.id });
   beendeAlteRunde();
-  showToast('🗑 Runde gelöscht');
+  showToast('🗑 Leistung gelöscht');
 }
 
 // ── TIMER-ANZEIGE ────────────────────────────────────────────────────────────

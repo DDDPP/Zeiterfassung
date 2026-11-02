@@ -518,7 +518,7 @@ function renderAlle(){
       <div class="tile"><div class="tile-val">${r.beric.length}</div><div class="tile-lbl">Baustellenberichte</div></div>
     </div>`;
 
-  if(a.offen) html += `<div class="note warn">⚠️ ${a.offen} Leistungsrunde(n) sind noch offen (kein Ende erfasst) und fehlen in den Stunden.</div>`;
+  if(a.offen) html += `<div class="note warn">⚠️ ${a.offen} Leistung(en) sind noch offen (kein Ende erfasst) und fehlen in den Stunden.</div>`;
   (r.hinweise || []).forEach(h => { html += `<div class="note warn">⚠️ ${esc(h)}</div>`; });
 
   // Übersicht je Projekt
@@ -570,7 +570,7 @@ function renderReport(){
       <div class="tile"><div class="tile-val">${fmtZahl(a.maschinenStd, 2)}</div><div class="tile-lbl">Maschinenstunden</div></div>
     </div>`;
 
-  if(a.offen) html += `<div class="note warn">⚠️ ${a.offen} Leistungsrunde(n) sind noch offen (kein Ende erfasst) und fehlen in den Stunden.</div>`;
+  if(a.offen) html += `<div class="note warn">⚠️ ${a.offen} Leistung(en) sind noch offen (kein Ende erfasst) und fehlen in den Stunden.</div>`;
   if(a.ohneBericht.length) html += `<div class="note info">ℹ️ Für ${a.ohneBericht.length === 1 ? 'diesen Tag liegt' : 'diese ' + a.ohneBericht.length + ' Tage liegen'} Leistungen, aber kein Baustellenbericht vor: ${a.ohneBericht.map(fmtDatum).join(', ')}</div>`;
   (r.hinweise || []).forEach(h => { html += `<div class="note warn">⚠️ ${esc(h)}</div>`; });
 
