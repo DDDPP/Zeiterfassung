@@ -194,6 +194,15 @@
         <input type="time" class="finput" id="editEnde">
       </div>
     </div>
+    <div class="fgroup" style="margin-top:14px">
+      <label class="flabel">Pause (Minuten)</label>
+      <input type="number" inputmode="numeric" min="0" max="480" step="1" class="finput" id="editPause" placeholder="0">
+      <div class="card-sub" style="margin:4px 0 0">Gilt für den ganzen Einsatz auf diesem Projekt an diesem Tag.</div>
+    </div>
+    <div class="fgroup" style="margin-top:14px">
+      <label class="flabel">Was hast du gemacht?</label>
+      <textarea class="finput" id="editWas" rows="2" maxlength="300"></textarea>
+    </div>
     <div class="timer-actions">
       <button class="btn-secondary" style="color:var(--red)" onclick="loescheAktuelleRunde()">🗑 Löschen</button>
       <button class="btn-primary" onclick="speichereBearbeitung()">Speichern</button>
@@ -317,6 +326,19 @@
     <div class="modal-text" id="projektModalText"></div>
     <button type="button" class="btn-primary" id="projektModalWaehlen">Projekt auswählen</button>
     <button type="button" class="btn-secondary" id="projektModalOhne">Ohne Projekt starten</button>
+  </div>
+</div>
+
+<!-- Pause und Beschreibung beim Abschluss eines Einsatzes (Fertig / Projektwechsel) -->
+<div class="modal-overlay" id="pauseModal">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="pauseModalTitel">
+    <div class="modal-title" id="pauseModalTitel">Pause gemacht?</div>
+    <div class="modal-text" id="pauseModalText"></div>
+    <div class="chip-group" id="pauseChips"></div>
+    <input type="number" inputmode="numeric" min="0" max="480" step="1" class="finput" id="pauseAndere" placeholder="Andere Dauer in Minuten" style="margin-top:8px">
+    <textarea class="finput" id="pauseWas" rows="2" maxlength="300" placeholder="Was hast du gemacht?" style="margin-top:12px"></textarea>
+    <button type="button" class="btn-primary" id="pauseModalOk" style="margin-top:16px">Speichern</button>
+    <button type="button" class="btn-secondary" id="pauseModalZurueck">Zurück</button>
   </div>
 </div>
 
@@ -679,10 +701,12 @@ function renderRundenHeute(runden){
       <div>
         <div class="runde-info">${esc(r.kategorie)}</div>
         ${r.projekt ? `<div class="runde-projekt">${esc(r.projekt)}</div>` : ''}
+        ${r.was ? `<div class="runde-projekt">„${esc(r.was)}"</div>` : ''}
       </div>
       <div>
         <div class="runde-dauer">${esc(r.dauerMin)} Min</div>
         <div class="runde-zeit">${formatUhrzeit(r.start)}–${formatUhrzeit(r.ende)}</div>
+        ${r.pauseMin ? `<div class="runde-zeit">Pause ${esc(r.pauseMin)} Min</div>` : ''}
       </div>
     </div>
   `).join('');
@@ -730,6 +754,8 @@ function oeffneBearbeiten(id){
 
   document.getElementById('editStart').value = formatZeitInput(runde.start);
   document.getElementById('editEnde').value = formatZeitInput(runde.ende);
+  document.getElementById('editPause').value = runde.pauseMin ? String(runde.pauseMin) : '';
+  document.getElementById('editWas').value = runde.was || '';
 
   document.getElementById('bearbeitenCard').style.display = '';
   document.getElementById('bearbeitenCard').scrollIntoView({behavior:'smooth', block:'nearest'});
@@ -781,10 +807,12 @@ function speichereBearbeitung(){
   if(!sperre()) return;
 
   const id = bearbeiteteRunde.id;
-  enqueue({ type:'leistung_update', token: TOKEN, id, kategorie, projekt, startZeit: neuStart.toISOString(), endZeit: neuEnde.toISOString() });
+  const pauseMin = bereinigePause(document.getElementById('editPause').value);
+  const was = document.getElementById('editWas').value.trim();
+  enqueue({ type:'leistung_update', token: TOKEN, id, kategorie, projekt, startZeit: neuStart.toISOString(), endZeit: neuEnde.toISOString(), pauseMin, was });
   // Anzeige sofort anpassen, der Abgleich mit dem Sheet folgt nach dem Senden
   letzteRundenHeute = letzteRundenHeute.map(r => r.id === id
-    ? Object.assign({}, r, { kategorie, projekt, start: neuStart.toISOString(), ende: neuEnde.toISOString(), dauerMin: Math.round((neuEnde - neuStart) / 60000) })
+    ? Object.assign({}, r, { kategorie, projekt, pauseMin, was, start: neuStart.toISOString(), ende: neuEnde.toISOString(), dauerMin: Math.round((neuEnde - neuStart) / 60000) })
     : r);
   renderRundenHeute(letzteRundenHeute);
   schliesseBearbeiten();
@@ -844,14 +872,26 @@ function bestaetigeAuswahl(){
   // Rückfrage, wenn für diese Tätigkeit ein Projekt erwartet wird, aber keins gewählt ist
   if(projektNoetig(kategorie) && !projekt && !ohneProjektOk){ zeigeProjektModal(kategorie); return; }
   ohneProjektOk = false;
-  if(!sperre()) return;
 
-  const jetzt = new Date().toISOString();
+  const jetzt = new Date().toISOString();   // Zeitpunkt des Tippens – gilt auch, wenn davor noch das Pause-Fenster kommt
+  // Wechsel auf ein anderes Projekt = Einsatz auf dem bisherigen Projekt ist beendet → Pause/Beschreibung erfragen
+  if(auswahlModus === 'wechsel' && aktuelleRunde && (aktuelleRunde.projekt || '').trim() !== (projekt || '').trim()){
+    zeigePauseModal({ art:'wechsel', jetzt, kategorie, projekt, projektIstNeu });
+    return;
+  }
+  if(!sperre()) return;
+  fuehreStartAus(kategorie, projekt, projektIstNeu, jetzt, null);
+}
+
+// abschluss = { pauseMin, was } für die bisherige Leistung (nur bei Projektwechsel), sonst null
+function fuehreStartAus(kategorie, projekt, projektIstNeu, jetzt, abschluss){
   const id = neueId();
   speichereVorauswahl(projekt);   // bleibt Vorauswahl der nächsten Runde, bis „Fertig"
 
   if(auswahlModus === 'wechsel' && aktuelleRunde){
-    enqueue({ type:'leistung_wechsel', token: TOKEN, id: aktuelleRunde.id, mitarbeiter: aktuellerMA, endZeit: jetzt, neue: { id, kategorie, projekt, startZeit: jetzt } });
+    const p = { type:'leistung_wechsel', token: TOKEN, id: aktuelleRunde.id, mitarbeiter: aktuellerMA, endZeit: jetzt, neue: { id, kategorie, projekt, startZeit: jetzt } };
+    if(abschluss){ p.pauseMin = abschluss.pauseMin; p.was = abschluss.was; }
+    enqueue(p);
   } else {
     enqueue({ type:'leistung_start', token: TOKEN, id, mitarbeiter: aktuellerMA, kategorie, projekt, startZeit: jetzt });
   }
@@ -895,12 +935,67 @@ function naechsteRunde(){
   zeigeAuswahl('wechsel');
 }
 
+// ── PAUSE + BESCHREIBUNG (bei „Fertig" und bei Projektwechsel) ───────────────────
+// Die Endzeit wird beim Tippen festgehalten (kontext.jetzt), nicht erst nach dem Fenster.
+let pauseKontext = null;
+let pauseWahl = 0;
+const PAUSE_WERTE = [0, 15, 30, 45, 60];
+function bereinigePause(v){
+  const n = Math.round(Number(v));
+  return (isFinite(n) && n > 0) ? Math.min(n, 480) : 0;
+}
+function renderPauseChips(){
+  document.getElementById('pauseChips').innerHTML = PAUSE_WERTE.map(m =>
+    `<button type="button" class="chip ${m === pauseWahl ? 'active' : ''}" onclick="waehlePause(${m})">${m === 0 ? 'Keine Pause' : m + ' Min'}</button>`).join('');
+}
+function waehlePause(m){
+  pauseWahl = m;
+  document.getElementById('pauseAndere').value = '';
+  renderPauseChips();
+}
+function zeigePauseModal(kontext){
+  if(pauseKontext) return;   // Fenster ist schon offen
+  pauseKontext = kontext;
+  pauseWahl = 0;
+  document.getElementById('pauseAndere').value = '';
+  document.getElementById('pauseWas').value = '';
+  const projekt = (aktuelleRunde && aktuelleRunde.projekt || '').trim();
+  document.getElementById('pauseModalText').textContent = projekt
+    ? 'Für deinen Einsatz auf „' + projekt + '".'
+    : 'Für deinen Einsatz ohne Projekt.';
+  renderPauseChips();
+  document.getElementById('pauseModal').style.display = 'flex';
+}
+function schliessePauseModal(){
+  document.getElementById('pauseModal').style.display = 'none';
+  pauseKontext = null;
+}
+function pauseModalSpeichern(){
+  const k = pauseKontext;
+  if(!k) return;
+  const eigene = document.getElementById('pauseAndere').value;
+  const pauseMin = eigene !== '' ? bereinigePause(eigene) : pauseWahl;
+  const was = document.getElementById('pauseWas').value.trim();
+  schliessePauseModal();
+  if(k.art === 'fertig') fuehreFertigAus(k.jetzt, { pauseMin, was });
+  else fuehreStartAus(k.kategorie, k.projekt, k.projektIstNeu, k.jetzt, { pauseMin, was });
+}
+document.getElementById('pauseModalOk').addEventListener('click', pauseModalSpeichern);
+document.getElementById('pauseModalZurueck').addEventListener('click', schliessePauseModal);
+document.getElementById('pauseAndere').addEventListener('input', function(){
+  if(this.value !== ''){ pauseWahl = -1; renderPauseChips(); }   // eigene Eingabe ersetzt die Auswahl
+});
+document.addEventListener('keydown', e => { if(e.key === 'Escape' && pauseKontext) schliessePauseModal(); });
+
 function rundeFertig(){
   if(!aktuelleRunde) return;
   if(istVeraltet(aktuelleRunde)){ zeigeVeraltet(); return; }
-  if(!sperre()) return;
-  const jetzt = new Date().toISOString();
-  enqueue({ type:'leistung_stop', token: TOKEN, id: aktuelleRunde.id, endZeit: jetzt });
+  zeigePauseModal({ art:'fertig', jetzt: new Date().toISOString() });
+}
+
+function fuehreFertigAus(jetzt, abschluss){
+  if(!aktuelleRunde) return;
+  enqueue({ type:'leistung_stop', token: TOKEN, id: aktuelleRunde.id, endZeit: jetzt, pauseMin: abschluss.pauseMin, was: abschluss.was });
   aktuelleRunde = null;
   loescheLokaleRunde();
   loescheVorauswahl();
