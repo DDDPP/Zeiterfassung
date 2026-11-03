@@ -224,7 +224,7 @@ async function ladeProjekte(){
     const data = await res.json();
     const sel = document.getElementById('projekt');
     sel.innerHTML = '<option value="">– auswählen –</option>';
-    (data.projekte || []).forEach(name => { sel.innerHTML += `<option>${name}</option>`; });
+    (data.projekte || []).slice().reverse().forEach(name => { sel.innerHTML += `<option>${name}</option>`; });
     sel.innerHTML += '<option value="__new__">+ Neues Projekt…</option>';
     let last; try{ last = localStorage.getItem('gh3_bb_lastProjekt'); }catch(e){}
     if(last && [...sel.options].some(o => o.value === last)){ sel.value = last; }

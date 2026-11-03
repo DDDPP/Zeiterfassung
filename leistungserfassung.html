@@ -610,10 +610,9 @@ async function pruefeAktuelleRunde(){
 
 // ── PROJEKTE LADEN ─────────────────────────────────────────────────────────────
 const PROJ_CACHE_KEY = 'gh3_le_projekte_cache';
-// Projekte immer alphabetisch (A–Z, deutsche Sortierung, Umlaute korrekt)
+// Projekte: die zuletzt angelegten oben. Die Liste kommt in Tabellenreihenfolge (neueste Zeile unten) und wird umgedreht.
 function fuelleProjekte(liste){
-  const az = [...new Set((liste || []).filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b, 'de', { sensitivity: 'base', numeric: true }));
+  const az = [...new Set((liste || []).filter(Boolean))].reverse();
   const projektOptionen = az.map(name => `<option>${esc(name)}</option>`).join('');
   const optionsHtml = '<option value="">– kein Projekt / nicht zutreffend –</option>' +
     projektOptionen +
@@ -637,7 +636,7 @@ function fuelleProjekte(liste){
   }
 }
 let bbProjektVorbelegt = false;
-// Neu eingetragenes Projekt sofort in die Liste aufnehmen (alphabetisch einsortiert)
+// Neu eingetragenes Projekt sofort in die Liste aufnehmen (steht dann ganz oben)
 function merkeNeuesProjekt(name){
   if(!name) return;
   let liste = [];

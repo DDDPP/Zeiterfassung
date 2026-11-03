@@ -254,7 +254,7 @@ document.getElementById('monatWahl').addEventListener('change', function(){
 
 // ── PROJEKTE ──────────────────────────────────────────────────────────────────
 function fuelleProjekte(liste){
-  const az = [...new Set((liste || []).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de', { sensitivity: 'base', numeric: true }));
+  const az = [...new Set((liste || []).filter(Boolean))].reverse();   // zuletzt angelegte Projekte oben (Tabelle: neueste Zeile unten)
   const sel = document.getElementById('projekt');
   const vorher = sel.value;
   sel.innerHTML = '<option value="">– auswählen –</option>' +
