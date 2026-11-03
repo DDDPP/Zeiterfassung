@@ -119,42 +119,15 @@ function prLeistungen_(ss, projekt, von, bis, hinweise) {
       kategorie: String(anzeige[r][idx.kategorie]).trim(),
       start: start,
       ende: ende,
-      bruttoMin: brutto,        // Ende − Start, vor Abzug der Pause
-      pauseMin: 0,              // wird unten gesetzt: bei dieser Leistung abgezogene Pause
-      dauerMin: brutto,         // netto = brutto − pauseMin (alle Summen im Report nutzen dieses Feld)
+      dauerMin: brutto,         // Ende − Start (brutto); die Pause zieht die Seite als eigene Minus-Zeile ab
+      pauseMin: pauseErfasst,   // beim Abschluss des Einsatzes erfasste Pause (Minuten), sonst 0
       offen: offen,
-      was: iWas >= 0 ? String(anzeige[r][iWas]).trim() : '',
-      pauseErfasst: pauseErfasst
+      was: iWas >= 0 ? String(anzeige[r][iWas]).trim() : ''
     });
   }
   if (ohneZeit) hinweise.push(ohneZeit + ' Leistung(en) ohne lesbare Startzeit wurden übersprungen.');
   out.sort(function (a, b) { return a.start < b.start ? -1 : a.start > b.start ? 1 : 0; });
 
-  // Pause abziehen: Sie wird beim Abschluss eines Einsatzes erfragt und gilt für den ganzen Einsatz
-  // (Projekt × Mitarbeiter × Tag). Abgezogen wird zuerst von der Leistung, an der sie erfasst wurde;
-  // ist die kürzer als die Pause, vom Rest davor (zuletzt begonnene zuerst), dann vom Rest danach.
-  const gruppen = {};
-  out.forEach(function (z) {
-    const k = [z.projekt.toLowerCase(), z.mitarbeiter.toLowerCase(), z.start.slice(0, 10)].join('|');
-    (gruppen[k] = gruppen[k] || []).push(z);
-  });
-  let nichtAbgezogen = 0;
-  Object.keys(gruppen).forEach(function (k) {
-    const zeilen = gruppen[k];
-    zeilen.forEach(function (quelle, qi) {
-      let rest = quelle.pauseErfasst;
-      if (!(rest > 0)) return;
-      const reihenfolge = [quelle].concat(zeilen.slice(0, qi).reverse(), zeilen.slice(qi + 1));
-      reihenfolge.forEach(function (z) {
-        if (rest <= 0 || z.offen) return;
-        const abzug = Math.min(rest, z.dauerMin);
-        z.dauerMin -= abzug; z.pauseMin += abzug; rest -= abzug;
-      });
-      nichtAbgezogen += rest;
-    });
-  });
-  if (nichtAbgezogen > 0) hinweise.push(nichtAbgezogen + ' Min. Pause konnten nicht abgezogen werden (länger als die erfassten Leistungen des Einsatzes).');
-  out.forEach(function (z) { delete z.pauseErfasst; });
   return out;
 }
 

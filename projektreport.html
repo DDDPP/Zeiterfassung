@@ -72,6 +72,7 @@
   .day{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:12px}
   .day-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px}
   .day-title{font-size:14px;font-weight:700}
+  tr.pause td{color:var(--muted);font-style:italic}
   .was{font-size:11px;font-weight:400;color:var(--muted);margin-top:2px;text-transform:none}
   .day-sum{font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
   .bericht{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--bg);border:1px solid var(--border);font-size:13px;line-height:1.5;break-inside:avoid}
@@ -210,6 +211,7 @@ function fmtDatum(iso){ return iso ? iso.slice(8,10) + '.' + iso.slice(5,7) + '.
 function fmtTag(iso){ return WOCHENTAGE[tagVon(iso).getDay()] + ', ' + fmtDatum(iso); }
 function fmtZahl(n, stellen){ return Number(n).toLocaleString('de-DE', { minimumFractionDigits: stellen, maximumFractionDigits: stellen }); }
 function fmtStd(min){ return fmtZahl(min / 60, 2); }
+function fmtStdV(min){ return min < 0 ? '−' + fmtStd(-min) : fmtStd(min); }   // negative Werte (Pause) mit echtem Minuszeichen
 function fmtZeitraum(von, bis){
   if(!von && !bis) return 'gesamter Zeitraum';
   if(von && !bis) return 'ab ' + fmtDatum(von);
@@ -328,6 +330,15 @@ async function erstelleReport(){
 
 // ── AUSWERTUNG ────────────────────────────────────────────────────────────────
 function katGruppe(k){ return String(k || '').split(':')[0].trim() || '–'; }
+// Pausen als eigene Minus-Zeilen („Tätigkeit" = Pause): Summen mindern sich, die Tätigkeiten bleiben brutto
+const PAUSE_KAT = 'Pause';
+function mitPausen(fertig){
+  const pausen = fertig.filter(l => l.pauseMin > 0).map(l => ({
+    projekt: l.projekt, mitarbeiter: l.mitarbeiter, kategorie: PAUSE_KAT, tag: l.tag,
+    start: l.start, ende: l.ende, dauerMin: -l.pauseMin, offen: false, istPause: true
+  }));
+  return fertig.concat(pausen);
+}
 function summiere(liste, schluessel){
   const m = new Map();
   liste.forEach(l => m.set(schluessel(l), (m.get(schluessel(l)) || 0) + l.dauerMin));
@@ -336,7 +347,8 @@ function summiere(liste, schluessel){
 function berechne(r){
   const leist = r.leist.map(l => Object.assign({}, l, { tag: String(l.start).slice(0, 10) }));
   const fertig = leist.filter(l => !l.offen);
-  const gesamtMin = fertig.reduce((s, l) => s + l.dauerMin, 0);
+  const fertigP = mitPausen(fertig);   // inkl. Pause-Minuszeilen
+  const gesamtMin = fertigP.reduce((s, l) => s + l.dauerMin, 0);   // netto
   const pauseMin = fertig.reduce((s, l) => s + (l.pauseMin || 0), 0);
   const maschinen = {};
   let maschinenStd = 0;
@@ -348,9 +360,9 @@ function berechne(r){
   const tageMitLeistung = new Set(leist.map(l => l.tag));
   const tageMitBericht = new Set(r.beric.map(b => b.datum));
   return {
-    leist, fertig, gesamtMin, pauseMin, maschinen, maschinenStd, tage,
-    jeMa: summiere(fertig, l => l.mitarbeiter || '–'),
-    jeKat: summiere(fertig, l => katGruppe(l.kategorie)),
+    leist, fertig: fertigP, gesamtMin, pauseMin, maschinen, maschinenStd, tage,
+    jeMa: summiere(fertigP, l => l.mitarbeiter || '–'),
+    jeKat: summiere(fertigP, l => katGruppe(l.kategorie)),
     offen: leist.filter(l => l.offen).length,
     ohneBericht: [...tageMitLeistung].filter(t => !tageMitBericht.has(t)).sort(),
     maCount: new Set(fertig.map(l => l.mitarbeiter)).size
@@ -361,12 +373,12 @@ function berechne(r){
 // Hinweis „Brutto − Pause = Netto" (nur wenn im Zeitraum Pausen erfasst wurden)
 function pauseNote(a){
   if(!a.pauseMin) return '';
-  return `<div class="note info">ℹ️ Alle Stunden sind <b>netto</b>: ${fmtStd(a.gesamtMin + a.pauseMin)} Std. Brutto − ${fmtStd(a.pauseMin)} Std. Pause = ${fmtStd(a.gesamtMin)} Std.</div>`;
+  return `<div class="note info">ℹ️ ${fmtStd(a.gesamtMin + a.pauseMin)} Std. Brutto − ${fmtStd(a.pauseMin)} Std. Pause = <b>${fmtStd(a.gesamtMin)} Std. netto</b>. Die Pause steht jeweils als eigene Minus-Zeile.</div>`;
 }
 function renderBalken(titel, zeilen, gesamt){
   if(!zeilen.length) return `<div class="rp-card"><h3>${titel}</h3><div class="empty">Keine Leistungen erfasst.</div></div>`;
   return `<div class="rp-card"><h3>${titel}</h3><table class="t"><tbody>` +
-    zeilen.map(([name, min]) => `<tr><td>${esc(name)}<div class="bar"><i style="width:${gesamt ? Math.round(min / gesamt * 100) : 0}%"></i></div></td><td class="num">${fmtStd(min)} Std.</td></tr>`).join('') +
+    zeilen.map(([name, min]) => `<tr><td>${esc(name)}<div class="bar"><i style="width:${gesamt && min > 0 ? Math.round(min / gesamt * 100) : 0}%"></i></div></td><td class="num">${min < 0 ? '−' + fmtStd(-min) : fmtStd(min)} Std.</td></tr>`).join('') +
     `</tbody></table></div>`;
 }
 
@@ -390,7 +402,7 @@ function renderBericht(b){
 function renderTag(tag, a){
   const le = a.leist.filter(l => l.tag === tag);
   const be = report.beric.filter(b => b.datum === tag);
-  const min = le.filter(l => !l.offen).reduce((s, l) => s + l.dauerMin, 0);
+  const min = le.filter(l => !l.offen).reduce((s, l) => s + l.dauerMin - (l.pauseMin || 0), 0);
   const tabelle = le.length ? `
     <table class="t">
       <thead><tr><th>Mitarbeiter</th><th>Tätigkeit</th><th>Zeit</th><th class="num">Dauer</th></tr></thead>
@@ -398,7 +410,8 @@ function renderTag(tag, a){
         <td>${esc(l.mitarbeiter)}</td>
         <td>${esc(l.kategorie)}${l.was ? `<div class="was">${esc(l.was)}</div>` : ''}</td>
         <td>${esc(String(l.start).slice(11))} – ${l.offen ? '<i>offen</i>' : esc(String(l.ende).slice(11))}</td>
-        <td class="num">${l.offen ? '–' : fmtStd(l.dauerMin) + ' Std.'}${l.pauseMin ? `<div class="was">− ${l.pauseMin} Min Pause</div>` : ''}</td></tr>`).join('')}</tbody>
+        <td class="num">${l.offen ? '–' : fmtStd(l.dauerMin) + ' Std.'}</td></tr>` +
+        (l.pauseMin ? `<tr class="pause"><td>${esc(l.mitarbeiter)}</td><td><i>Pause</i></td><td></td><td class="num">− ${fmtStd(l.pauseMin)} Std.</td></tr>` : '')).join('')}</tbody>
     </table>` : '<div class="empty">Keine Leistungen erfasst.</div>';
   return `<div class="day">
     <div class="day-head"><div class="day-title">${fmtTag(tag)}</div><div class="day-sum">${le.length ? fmtStd(min) + ' Std. Personenzeit' : ''}</div></div>
@@ -439,11 +452,12 @@ const EBENE = { ma: l => l.mitarbeiter || '–', pr: l => l.projekt, ka: l => ka
 function berechneAlle(r){
   const leist = r.leist.map(l => Object.assign({}, l, { tag: String(l.start).slice(0, 10) }));
   const fertig = leist.filter(l => !l.offen);
-  const gesamtMin = fertig.reduce((s, l) => s + l.dauerMin, 0);
+  const fertigP = mitPausen(fertig);   // inkl. Pause-Minuszeilen
+  const gesamtMin = fertigP.reduce((s, l) => s + l.dauerMin, 0);   // netto
   const pauseMin = fertig.reduce((s, l) => s + (l.pauseMin || 0), 0);
   const projekte = new Map();
   const pe = name => { if(!projekte.has(name)) projekte.set(name, { name, min: 0, ma: new Set(), berichte: 0, maschStd: 0 }); return projekte.get(name); };
-  fertig.forEach(l => { const e = pe(l.projekt); e.min += l.dauerMin; e.ma.add(l.mitarbeiter); });
+  fertigP.forEach(l => { const e = pe(l.projekt); e.min += l.dauerMin; if(!l.istPause) e.ma.add(l.mitarbeiter); });
   r.beric.forEach(b => {
     const e = pe(b.projekt); e.berichte++;
     Object.keys(b.gruppen || {}).forEach(k => { e.maschStd += Number(b.gruppen[k].stunden) || 0; });
@@ -451,12 +465,12 @@ function berechneAlle(r){
   const projektListe = sortiereGruppen([...projekte.values()], true);
   const ohneMin = (projekte.get(OHNE) || { min: 0 }).min;
   return {
-    leist, fertig, gesamtMin, pauseMin, projektListe, ohneMin,
+    leist, fertig: fertigP, gesamtMin, pauseMin, projektListe, ohneMin,
     projektAnzahl: projektListe.filter(p => p.name !== OHNE).length,
     maCount: new Set(fertig.map(l => l.mitarbeiter)).size,
     offen: leist.filter(l => l.offen).length,
-    jeMa: summiere(fertig, l => l.mitarbeiter || '–'),
-    jeKat: summiere(fertig, l => katGruppe(l.kategorie)),
+    jeMa: summiere(fertigP, l => l.mitarbeiter || '–'),
+    jeKat: summiere(fertigP, l => katGruppe(l.kategorie)),
     maschStd: projektListe.reduce((s, p) => s + p.maschStd, 0)
   };
 }
@@ -472,11 +486,11 @@ function renderBaum(a){
   if(!a.fertig.length) return '<div class="rp-card"><div class="empty">Keine abgeschlossenen Leistungen im Zeitraum.</div></div>';
   return sortiereGruppen(gruppiere(a.fertig, EBENE[e0]), e0 === 'pr').map(g0 => {
     const zeilen = sortiereGruppen(gruppiere(g0.items, EBENE[e1]), e1 === 'pr').map(g1 =>
-      `<tr class="g1"><td>${esc(g1.name)}</td><td class="num">${fmtStd(g1.min)} Std.</td></tr>` +
+      `<tr class="g1"><td>${esc(g1.name)}</td><td class="num">${fmtStdV(g1.min)} Std.</td></tr>` +
       sortiereGruppen(gruppiere(g1.items, EBENE[e2]), false).map(g2 =>
-        `<tr class="g2"><td>${esc(g2.name)}</td><td class="num">${fmtStd(g2.min)} Std.</td></tr>`).join('')
+        `<tr class="g2"><td>${esc(g2.name)}</td><td class="num">${fmtStdV(g2.min)} Std.</td></tr>`).join('')
     ).join('');
-    return `<details class="grp"><summary><span>${esc(g0.name)}</span><span class="num">${fmtStd(g0.min)} Std.</span></summary>` +
+    return `<details class="grp"><summary><span>${esc(g0.name)}</span><span class="num">${fmtStdV(g0.min)} Std.</span></summary>` +
       `<table class="t"><tbody>${zeilen}</tbody></table></details>`;
   }).join('');
 }
@@ -632,7 +646,7 @@ function exportLeistungenCsv(){
   const kopf = ['Projekt','Datum','Mitarbeiter','Tätigkeit','Start','Ende','Brutto (Std.)','Pause (Min)','Netto (Std.)','Was gemacht'];
   const zeilen = report.auswertung.leist.map(l => [report.alle ? l.projekt : report.projekt, fmtDatum(l.tag), l.mitarbeiter, l.kategorie,
     String(l.start).slice(11), l.offen ? '' : String(l.ende).slice(11),
-    l.offen ? '' : fmtZahl((l.bruttoMin != null ? l.bruttoMin : l.dauerMin) / 60, 2), l.pauseMin || '', l.offen ? '' : fmtZahl(l.dauerMin / 60, 2), l.was || '']);
+    l.offen ? '' : fmtZahl(l.dauerMin / 60, 2), l.pauseMin || '', l.offen ? '' : fmtZahl((l.dauerMin - (l.pauseMin || 0)) / 60, 2), l.was || '']);
   ladeCsv(dateiBasis() + '_Leistungen.csv', [kopf, ...zeilen]);
 }
 // Gesamtauszug: je Projekt × Mitarbeiter × Tätigkeit eine Zeile mit Stunden (gut für Pivot in Excel)
