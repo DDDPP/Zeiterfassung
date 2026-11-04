@@ -54,9 +54,13 @@
   /* Rückfrage „Kein Projekt ausgewählt" */
   .modal-overlay{position:fixed;inset:0;background:rgba(17,24,39,.55);display:none;align-items:center;justify-content:center;padding:20px;z-index:300}
   .modal-box{background:var(--surface);border-radius:var(--radius);padding:22px 20px 20px;width:100%;max-width:360px;max-height:calc(100vh - 40px);overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.25)}
-  .pause-liste{margin-top:14px}
-  .pause-liste .pl-row{margin-top:10px}
-  .pause-liste .pl-label{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px}
+  .pause-titel{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:18px 0 8px}
+  .pause-trenner{border-top:1.5px solid var(--border);margin:22px -20px 0}
+  .pause-liste .pl-row{background:var(--bg);border:1.5px solid var(--border);border-radius:12px;padding:10px 12px 12px;margin-top:8px}
+  .pause-liste .pl-kopf{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:7px}
+  .pause-liste .pl-kat{font-size:14px;font-weight:700}
+  .pause-liste .pl-zeit{font-size:12px;color:var(--muted);white-space:nowrap}
+  .pause-liste .finput{background:var(--surface)}
   .modal-title{font-size:17px;font-weight:700;margin-bottom:6px}
   .modal-text{font-size:14px;color:var(--muted);line-height:1.45;margin-bottom:18px}
   .modal-box .btn-secondary{margin-top:8px}
@@ -335,10 +339,13 @@
 <!-- Pause und Beschreibung beim Abschluss eines Einsatzes (Fertig / Projektwechsel) -->
 <div class="modal-overlay" id="pauseModal">
   <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="pauseModalTitel">
-    <div class="modal-title" id="pauseModalTitel">Pause gemacht?</div>
-    <div class="modal-text" id="pauseModalText"></div>
+    <div class="modal-title" id="pauseModalTitel">Einsatz abschließen</div>
+    <div class="modal-text" id="pauseModalText" style="margin-bottom:0"></div>
+    <div class="pause-titel">Pause gemacht?</div>
     <div class="chip-group" id="pauseChips"></div>
     <input type="number" inputmode="numeric" min="0" max="480" step="1" class="finput" id="pauseAndere" placeholder="Andere Dauer in Minuten" style="margin-top:8px">
+    <div class="pause-trenner"></div>
+    <div class="pause-titel">Was hast du gemacht?</div>
     <div id="pauseListe" class="pause-liste"></div>
     <button type="button" class="btn-primary" id="pauseModalOk" style="margin-top:16px">Speichern</button>
     <button type="button" class="btn-secondary" id="pauseModalZurueck">Zurück</button>
@@ -1000,8 +1007,8 @@ function zeigePauseModal(kontext){
   // Pro Leistung des Einsatzes ein eigenes Textfeld; leer lassen ist in Ordnung
   document.getElementById('pauseListe').innerHTML = einsatzFuerFenster(kontext.jetzt).map(it => `
     <div class="pl-row">
-      <div class="pl-label">${esc(it.kategorie)} · ${formatUhrzeit(it.start)}–${formatUhrzeit(it.ende)}</div>
-      <input type="text" class="finput pl-was" data-id="${esc(it.id)}" maxlength="300" placeholder="Was hast du gemacht?" autocomplete="off">
+      <div class="pl-kopf"><span class="pl-kat">${esc(it.kategorie)}</span><span class="pl-zeit">${formatUhrzeit(it.start)}–${formatUhrzeit(it.ende)}</span></div>
+      <input type="text" class="finput pl-was" data-id="${esc(it.id)}" maxlength="300" placeholder="Kurz beschreiben …" autocomplete="off">
     </div>`).join('');
   document.getElementById('pauseModal').style.display = 'flex';
 }
