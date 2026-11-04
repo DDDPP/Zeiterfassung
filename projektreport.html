@@ -188,6 +188,9 @@ const WOCHENTAGE = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 const GRUPPEN_LABEL = { g1:'Gruppe 1 – Bohren/Sägen/Pumpe', g2:'Gruppe 2 – Rütteln/Schneiden', g3:'Gruppe 3 – Mähen/Sägen', g4:'Gruppe 4 – Bagger', g5:'Gruppe 5 – Weitere' };
 const PROJ_CACHE_KEY = 'gh3_rp_projekte_cache';
 const LAST_PROJEKT_KEY = 'gh3_rp_lastProjekt';
+const UK_CACHE_KEY = 'gh3_rp_unterkat_cache';
+let ukRegistriert = {};   // { Projekt: [Unterkategorien] } aus dem Tab „Projekt-Unterkategorien"
+try{ const c = JSON.parse(localStorage.getItem(UK_CACHE_KEY) || '{}'); if(c && typeof c === 'object' && !Array.isArray(c)) ukRegistriert = c; }catch(e){}
 const ALLE = '__alle__';            // Wert der Auswahl „Alle Projekte"
 const OHNE = 'Ohne Projekt';        // Anzeigename für Leistungen ohne Projekt
 const OHNE_UK = 'ohne Unterkategorie';   // Anzeigename für Leistungen/Berichte ohne Projekt-Unterkategorie
@@ -278,6 +281,10 @@ async function ladeProjekte(){
     const data = await res.json();
     const liste = data.projekte || [];
     try{ localStorage.setItem(PROJ_CACHE_KEY, JSON.stringify(liste)); }catch(e){}
+    if(data.unterkategorien && typeof data.unterkategorien === 'object' && !Array.isArray(data.unterkategorien)){
+      ukRegistriert = data.unterkategorien;
+      try{ localStorage.setItem(UK_CACHE_KEY, JSON.stringify(ukRegistriert)); }catch(e){}
+    }
     fuelleProjekte(liste);
   }catch(e){ console.warn('Projektliste konnte nicht geladen werden:', e); showToast('⚠️ Projektliste nicht geladen'); }
 }
@@ -314,6 +321,7 @@ async function erstelleReport(){
       hinweise: data.hinweise || [],
       erstellt: new Date()
     };
+    report.skriptAlt = (report.leist.length + report.beric.length) > 0 && ![...report.leist, ...report.beric].some(x => 'unterkategorie' in x);   // Report-Skript kennt das Feld noch nicht
     normalisiereUnterkategorien(report.leist, report.beric);
     report.leistAll = report.leist; report.bericAll = report.beric;   // ungefiltert; der Unterkategorie-Filter wirkt auf leist/beric
     ukFilter = null;
@@ -350,9 +358,23 @@ function normalisiereUnterkategorien(...listen){
   }));
 }
 function hatUkDaten(r){ return [...(r.leistAll || r.leist), ...(r.bericAll || r.beric)].some(x => x.unterkategorie); }
-function ukNamen(r){
-  return [...new Set([...(r.leistAll || r.leist), ...(r.bericAll || r.beric)].map(x => x.unterkategorie).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
+// Registrierte Unterkategorien des Projekts (Tab „Projekt-Unterkategorien")
+function ukRegistrierte(r){
+  if(r.alle) return [];
+  const p = String(r.projekt || '').trim().toLowerCase();
+  const key = Object.keys(ukRegistriert).find(k => k.trim().toLowerCase() === p);
+  return key && Array.isArray(ukRegistriert[key]) ? ukRegistriert[key] : [];
 }
+// Alle bekannten Unterkategorien: aus den Daten und aus dem Tab (Schreibweise ohne Groß-/Kleinschreibung zusammengeführt)
+function ukNamen(r){
+  const m = new Map();
+  [...ukRegistrierte(r), ...[...(r.leistAll || r.leist), ...(r.bericAll || r.beric)].map(x => x.unterkategorie)].forEach(n => {
+    n = String(n || '').trim();
+    if(n && !m.has(n.toLowerCase())) m.set(n.toLowerCase(), n);
+  });
+  return [...m.values()].sort((a, b) => a.localeCompare(b, 'de'));
+}
+function zeigeUkFilter(r){ return hatUkDaten(r) || ukRegistrierte(r).length > 0; }
 // Filter anwenden (nur Einzelprojekt): wirkt auf Leistungen und Baustellenberichte
 function wendeUkFilterAn(r){
   const passt = x => ukFilter === null || (x.unterkategorie || '') === ukFilter;
@@ -635,7 +657,8 @@ function renderReport(){
       <h1>Projektreport: ${esc(r.projekt)}</h1>
       <div class="rp-meta">Zeitraum: <b>${esc(fmtZeitraum(r.von, r.bis))}</b><br>
         ${ukFilter !== null ? 'Unterkategorie: <b>' + esc(ukLabel(ukFilter)) + '</b><br>' : ''}Erstellt am ${fmtDatum(isoLokal(r.erstellt))} um ${pad(r.erstellt.getHours())}:${pad(r.erstellt.getMinutes())} Uhr</div>
-    </div>` + (a.hatUk ? renderUkFilter(r) : '');
+    </div>` + (zeigeUkFilter(r) ? renderUkFilter(r) : '') +
+    (r.skriptAlt && ukRegistrierte(r).length ? '<div class="note warn">⚠️ Der Report-Teil des Skripts liefert noch keine Unterkategorien – bitte <b>ProjektReport.gs</b> in Apps Script aktualisieren und neu bereitstellen. Bis dahin ist der Filter wirkungslos.</div>' : '');
 
   if(!hatDaten){
     return void (document.getElementById('report').innerHTML = html +
