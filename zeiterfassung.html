@@ -239,6 +239,28 @@
   </div>
 </div>
 
+<!-- MODAL: Vergessenes Ausstempeln (Schicht eines früheren Tages ohne Ende) -->
+<div class="overlay hidden" id="vergessenModal">
+  <div class="modal" style="padding-bottom:28px">
+    <div class="mhandle"></div>
+    <div class="mtitle">🕐 Wann hast du Feierabend gemacht?</div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:16px" id="vergessenText"></p>
+    <div class="fgroup">
+      <label class="flabel">Feierabend (Uhrzeit)</label>
+      <input type="time" class="finput" id="vergessenEnde">
+    </div>
+    <div class="fgroup">
+      <label class="flabel">Pause in Minuten</label>
+      <input type="number" class="finput" id="vergessenPause" min="0" max="480" step="5" placeholder="z.B. 30">
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-top:-8px;margin-bottom:14px" id="vergessenHinweis"></div>
+    <div class="mactions">
+      <button class="btn-secondary" onclick="vergessenSpaeter()">Später</button>
+      <button class="btn-primary" onclick="vergessenSpeichern()">✓ Speichern</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: Löschen -->
 <div class="overlay hidden" id="confirmModal">
   <div class="modal" style="padding-bottom:26px">
@@ -385,6 +407,9 @@ let entries = safeGet('gh3_entries', []);
 let webhookUrl = WEBHOOK_BASE;
 try{webhookUrl=localStorage.getItem('gh3_webhook')||webhookUrl}catch(e){}
 let editIdx = null, pendingDelIdx = null, rangeType = 'Urlaub';
+// Zustand für „Vergessenes Ausstempeln" – muss vor der Uhr (updateClock → refreshStempelUI) deklariert sein
+let vergessenKontext = null, vergessenPauseGeaendert = false;
+const vergessenAufgeschoben = new Set();
 
 // ── PAUSE GESETZ ──────────────────────────────────────────────────────────────
 function legalPause(workMins) {
@@ -612,7 +637,74 @@ function confirmPause(useLegal){
   showToast(`🔴 Feierabend! Pause: ${pauseMins} Min · Arbeitszeit: ${fmtMins(netMins)}`);
 }
 
+// ── VERGESSENES AUSSTEMPELN ────────────────────────────────────────────────────
+// Ist eine Schicht von einem früheren Tag noch ohne Ende, fragt die App beim Öffnen nach dem Feierabend.
+// Nur im persönlichen Link (Token): niemand arbeitet über Mitternacht, eine offene Schicht von gestern ist also vergessen.
+// „Später" blendet die Frage nur bis zum nächsten Öffnen der App aus.
+function findeVergessene(name){
+  const today=new Date().toISOString().split('T')[0];
+  return entries
+    .filter(e=>e.name===name && e.type==='work' && Array.isArray(e.shifts) && e.date<today
+      && e.shifts.some(s=>!s.end) && !vergessenAufgeschoben.has(e.id))
+    .sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+}
+function pruefeVergessenes(){
+  if(!URL_TOKEN || vergessenKontext) return;
+  if(document.querySelector('.overlay:not(.hidden)')) return;   // nicht über ein anderes Fenster legen
+  const name=getMA(true); if(!name) return;
+  const e=findeVergessene(name)[0]; if(!e) return;
+  const si=e.shifts.findIndex(s=>!s.end);
+  vergessenKontext={ id:e.id, shiftIdx:si };
+  vergessenPauseGeaendert=false;
+  const nr = e.shifts.length>1 ? ` (Schicht ${si+1})` : '';
+  document.getElementById('vergessenText').textContent =
+    `Am ${formatDate(e.date)} hast du dich um ${e.shifts[si].start} Uhr eingestempelt${nr}, aber nicht wieder ausgestempelt. Bitte trage ein, wann du Schluss gemacht hast.`;
+  document.getElementById('vergessenEnde').value='';
+  document.getElementById('vergessenPause').value='';
+  document.getElementById('vergessenHinweis').textContent='';
+  document.getElementById('vergessenModal').classList.remove('hidden');
+}
+function vergessenSchicht(){
+  if(!vergessenKontext) return null;
+  const e=entries.find(x=>x.id===vergessenKontext.id);
+  return e ? { e, s:e.shifts[vergessenKontext.shiftIdx] } : null;
+}
+function vergessenAktualisiere(){
+  const k=vergessenSchicht(); if(!k) return;
+  const c=calcEntry(k.s.start, document.getElementById('vergessenEnde').value);
+  if(!c){ document.getElementById('vergessenHinweis').textContent=''; return; }
+  if(!vergessenPauseGeaendert) document.getElementById('vergessenPause').value=c.pauseMins;
+  document.getElementById('vergessenHinweis').textContent =
+    c.pauseMins>0 ? `⚖️ Gesetzlich vorgeschrieben: ${c.pauseMins} Min` : '⚖️ Keine gesetzliche Pause erforderlich';
+}
+document.getElementById('vergessenEnde').addEventListener('input', vergessenAktualisiere);
+document.getElementById('vergessenPause').addEventListener('input', ()=>{ vergessenPauseGeaendert=true; });
+
+function vergessenSpaeter(){
+  if(vergessenKontext) vergessenAufgeschoben.add(vergessenKontext.id);
+  vergessenKontext=null;
+  document.getElementById('vergessenModal').classList.add('hidden');
+}
+function vergessenSpeichern(){
+  const k=vergessenSchicht(); if(!k) return;
+  const end=document.getElementById('vergessenEnde').value;
+  if(!end){ showToast('⚠️ Bitte die Uhrzeit eintragen'); return; }
+  const c=calcEntry(k.s.start, end);
+  if(!c){ showToast('⚠️ Feierabend muss nach dem Beginn ('+k.s.start+') liegen'); return; }
+  const pause=Math.max(0, parseInt(document.getElementById('vergessenPause').value)||0);
+  if(pause>=c.rawMins){ showToast('⚠️ Pause ist nicht kürzer als die Arbeitszeit'); return; }
+  if(c.pauseMins>0 && pause<c.pauseMins) showToast(`⚠️ Achtung: Unter gesetzlicher Mindestpause (${c.pauseMins} Min)`);
+  k.s.end=end; k.s.pause=pause; k.s.net=c.rawMins-pause;
+  k.e.net=k.e.shifts.reduce((sum,x)=>sum+(x.net||0),0);
+  save(); sendToSheet(k.e);
+  vergessenKontext=null;
+  document.getElementById('vergessenModal').classList.add('hidden');
+  showToast(`✅ Feierabend ${end} gespeichert · Arbeitszeit ${fmtMins(k.s.net)}`);
+  renderEntries(); refreshStempelUI();
+}
+
 function refreshStempelUI(){
+  pruefeVergessenes();
   const name=getMA(true);
   if(!name) return;
   const today=new Date().toISOString().split('T')[0];
