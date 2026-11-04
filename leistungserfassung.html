@@ -53,7 +53,10 @@
   .finput.hinweis{border-color:var(--orange);box-shadow:0 0 0 3px var(--orange-light)}
   /* Rückfrage „Kein Projekt ausgewählt" */
   .modal-overlay{position:fixed;inset:0;background:rgba(17,24,39,.55);display:none;align-items:center;justify-content:center;padding:20px;z-index:300}
-  .modal-box{background:var(--surface);border-radius:var(--radius);padding:22px 20px 20px;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.25)}
+  .modal-box{background:var(--surface);border-radius:var(--radius);padding:22px 20px 20px;width:100%;max-width:360px;max-height:calc(100vh - 40px);overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.25)}
+  .pause-liste{margin-top:14px}
+  .pause-liste .pl-row{margin-top:10px}
+  .pause-liste .pl-label{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px}
   .modal-title{font-size:17px;font-weight:700;margin-bottom:6px}
   .modal-text{font-size:14px;color:var(--muted);line-height:1.45;margin-bottom:18px}
   .modal-box .btn-secondary{margin-top:8px}
@@ -336,7 +339,7 @@
     <div class="modal-text" id="pauseModalText"></div>
     <div class="chip-group" id="pauseChips"></div>
     <input type="number" inputmode="numeric" min="0" max="480" step="1" class="finput" id="pauseAndere" placeholder="Andere Dauer in Minuten" style="margin-top:8px">
-    <textarea class="finput" id="pauseWas" rows="2" maxlength="300" placeholder="Was hast du gemacht?" style="margin-top:12px"></textarea>
+    <div id="pauseListe" class="pause-liste"></div>
     <button type="button" class="btn-primary" id="pauseModalOk" style="margin-top:16px">Speichern</button>
     <button type="button" class="btn-secondary" id="pauseModalZurueck">Zurück</button>
   </div>
@@ -882,18 +885,50 @@ function bestaetigeAuswahl(){
   fuehreStartAus(kategorie, projekt, projektIstNeu, jetzt, null);
 }
 
-// abschluss = { pauseMin, was } für die bisherige Leistung (nur bei Projektwechsel), sonst null
+// ── EINSATZ (aufeinanderfolgende Leistungen auf demselben Projekt) ─────────────
+// Wird lokal mitgeführt, damit beim Abschluss jede Leistung ihr eigenes Textfeld bekommt – auch ohne Netz.
+const EINSATZ_KEY = 'gh3_le_einsatz';
+function ladeEinsatz(){
+  try{
+    const v = JSON.parse(localStorage.getItem(EINSATZ_KEY) || 'null');
+    return (v && v.mitarbeiter === aktuellerMA && Array.isArray(v.items)) ? v.items : [];
+  }catch(e){ return []; }
+}
+function speichereEinsatz(items){
+  try{ localStorage.setItem(EINSATZ_KEY, JSON.stringify({ mitarbeiter: aktuellerMA, items })); }catch(e){}
+}
+function loescheEinsatz(){ try{ localStorage.removeItem(EINSATZ_KEY); }catch(e){} }
+// Leistungen des laufenden Einsatzes inkl. Endzeiten (Ende = Start der nächsten, bei der letzten „jetzt")
+function einsatzFuerFenster(jetzt){
+  if(!aktuelleRunde) return [];
+  let items = ladeEinsatz();
+  if(!items.length || items[items.length - 1].id !== aktuelleRunde.id){
+    items = [{ id: aktuelleRunde.id, kategorie: aktuelleRunde.kategorie, start: aktuelleRunde.start }];   // Fallback: nur die laufende
+  }
+  return items.map((it, i) => Object.assign({}, it, { ende: i + 1 < items.length ? items[i + 1].start : jetzt }));
+}
+// Texte der früheren Leistungen des Einsatzes eintragen (die letzte geht mit Stop/Wechsel mit)
+function sendeNotizen(notizen){
+  (notizen || []).filter(n => n.id && n.was).forEach(n => enqueue({ type:'leistung_notiz', token: TOKEN, id: n.id, was: n.was }));
+}
+
+// abschluss = { pauseMin, was, notizen } für den bisherigen Einsatz (nur bei Projektwechsel), sonst null
 function fuehreStartAus(kategorie, projekt, projektIstNeu, jetzt, abschluss){
   const id = neueId();
   speichereVorauswahl(projekt);   // bleibt Vorauswahl der nächsten Runde, bis „Fertig"
+  const neuerPunkt = { id, kategorie, start: jetzt };
+  let einsatz = [neuerPunkt];   // neuer Einsatz …
 
   if(auswahlModus === 'wechsel' && aktuelleRunde){
     const p = { type:'leistung_wechsel', token: TOKEN, id: aktuelleRunde.id, mitarbeiter: aktuellerMA, endZeit: jetzt, neue: { id, kategorie, projekt, startZeit: jetzt } };
     if(abschluss){ p.pauseMin = abschluss.pauseMin; p.was = abschluss.was; }
     enqueue(p);
+    if(abschluss) sendeNotizen(abschluss.notizen);
+    else einsatz = einsatzFuerFenster(jetzt).map(({ id, kategorie, start }) => ({ id, kategorie, start })).concat([neuerPunkt]);   // … oder gleicher Einsatz geht weiter
   } else {
     enqueue({ type:'leistung_start', token: TOKEN, id, mitarbeiter: aktuellerMA, kategorie, projekt, startZeit: jetzt });
   }
+  speichereEinsatz(einsatz);
   aktuelleRunde = { id, mitarbeiter: aktuellerMA, kategorie, projekt, start: jetzt };
   speichereLokaleRunde(aktuelleRunde);
   if(projektIstNeu) merkeNeuesProjekt(projekt);
@@ -957,12 +992,17 @@ function zeigePauseModal(kontext){
   pauseKontext = kontext;
   pauseWahl = 0;
   document.getElementById('pauseAndere').value = '';
-  document.getElementById('pauseWas').value = '';
   const projekt = (aktuelleRunde && aktuelleRunde.projekt || '').trim();
   document.getElementById('pauseModalText').textContent = projekt
     ? 'Für deinen Einsatz auf „' + projekt + '".'
     : 'Für deinen Einsatz ohne Projekt.';
   renderPauseChips();
+  // Pro Leistung des Einsatzes ein eigenes Textfeld; leer lassen ist in Ordnung
+  document.getElementById('pauseListe').innerHTML = einsatzFuerFenster(kontext.jetzt).map(it => `
+    <div class="pl-row">
+      <div class="pl-label">${esc(it.kategorie)} · ${formatUhrzeit(it.start)}–${formatUhrzeit(it.ende)}</div>
+      <input type="text" class="finput pl-was" data-id="${esc(it.id)}" maxlength="300" placeholder="Was hast du gemacht?" autocomplete="off">
+    </div>`).join('');
   document.getElementById('pauseModal').style.display = 'flex';
 }
 function schliessePauseModal(){
@@ -974,10 +1014,12 @@ function pauseModalSpeichern(){
   if(!k) return;
   const eigene = document.getElementById('pauseAndere').value;
   const pauseMin = eigene !== '' ? bereinigePause(eigene) : pauseWahl;
-  const was = document.getElementById('pauseWas').value.trim();
+  const texte = [...document.querySelectorAll('#pauseListe .pl-was')].map(i => ({ id: i.dataset.id, was: i.value.trim() }));
+  const letzte = texte.length ? texte[texte.length - 1] : { was: '' };
+  const abschluss = { pauseMin, was: letzte.was, notizen: texte.slice(0, -1) };   // die letzte Leistung wird mit Stop/Wechsel abgeschlossen
   schliessePauseModal();
-  if(k.art === 'fertig') fuehreFertigAus(k.jetzt, { pauseMin, was });
-  else fuehreStartAus(k.kategorie, k.projekt, k.projektIstNeu, k.jetzt, { pauseMin, was });
+  if(k.art === 'fertig') fuehreFertigAus(k.jetzt, abschluss);
+  else fuehreStartAus(k.kategorie, k.projekt, k.projektIstNeu, k.jetzt, abschluss);
 }
 document.getElementById('pauseModalOk').addEventListener('click', pauseModalSpeichern);
 document.getElementById('pauseModalZurueck').addEventListener('click', schliessePauseModal);
@@ -995,6 +1037,8 @@ function rundeFertig(){
 function fuehreFertigAus(jetzt, abschluss){
   if(!aktuelleRunde) return;
   enqueue({ type:'leistung_stop', token: TOKEN, id: aktuelleRunde.id, endZeit: jetzt, pauseMin: abschluss.pauseMin, was: abschluss.was });
+  sendeNotizen(abschluss.notizen);
+  loescheEinsatz();
   aktuelleRunde = null;
   loescheLokaleRunde();
   loescheVorauswahl();
@@ -1025,6 +1069,7 @@ function zeigeVeraltet(){
   document.getElementById('staleCard').style.display = '';
 }
 function beendeAlteRunde(){
+  loescheEinsatz();
   aktuelleRunde = null;
   loescheLokaleRunde();
   loescheVorauswahl();
