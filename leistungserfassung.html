@@ -50,7 +50,6 @@
   .projekt-banner.kein{background:#C2410C}
   .projekt-banner.kein .projekt-banner-name{display:none}
   .projekt-banner.kein.nichtnoetig{background:#6B7280}   /* Tätigkeit ohne Projektpflicht: neutral statt Warnfarbe */
-  .verinfo{text-align:center;font-size:11px;color:var(--muted);margin:26px 0 4px}
   .uk-block{margin-top:12px}
   .uk-link{background:none;border:0;padding:4px 0;font:inherit;font-size:13px;font-weight:600;color:var(--green);cursor:pointer}
   .finput.hinweis{border-color:var(--orange);box-shadow:0 0 0 3px var(--orange-light)}
@@ -345,7 +344,6 @@
 
   </div><!-- /tabBericht -->
 
-  <div class="verinfo" id="verInfo"></div>
 </div><!-- /main -->
 
 <!-- Rückfrage: kein Projekt ausgewählt -->
@@ -1504,8 +1502,6 @@ function resetBerichtForm(){
 }
 
 // ── INIT ───────────────────────────────────────────────────────────────────────
-const APP_VERSION = 61;   // gleiche Nummer wie CACHE_VERSION in sw.js
-document.getElementById('verInfo').textContent = 'Version ' + APP_VERSION;
 document.getElementById('bbDatum').value = heuteLokal();
 ['g1','g2','g3'].forEach(renderGruppe);
 renderFahrten();

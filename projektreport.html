@@ -35,7 +35,6 @@
   .finput{width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--text)}
   .finput:focus{outline:none;border-color:var(--blue)}
   select.finput{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;cursor:pointer}
-  .verinfo{text-align:center;font-size:11px;color:var(--muted);margin:26px 0 4px}
   .ukfilter{margin-bottom:14px}
   .ukfilter .flabel{margin-bottom:6px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -146,6 +145,10 @@
       <label class="flabel">Projekt</label>
       <select class="finput" id="projekt"><option value="">– auswählen –</option></select>
     </div>
+    <div class="fgroup" id="ukGroup" style="display:none">
+      <label class="flabel">Unterkategorie</label>
+      <select class="finput" id="ukSel"></select>
+    </div>
     <div class="fgroup">
       <label class="flabel">Zeitraum</label>
       <div class="chip-group" id="zrChips"></div>
@@ -178,7 +181,6 @@
     </div>
     <div id="report"></div>
   </div>
-  <div class="verinfo noprint" id="verInfo"></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -200,6 +202,7 @@ const MONATE = ['Januar','Februar','März','April','Mai','Juni','Juli','August',
 
 let report = null;   // { projekt, alle, von, bis, leist, beric, erstellt }
 let ansicht = 'ma';  // Gesamtauszug: 'ma' = nach Mitarbeiter, 'pr' = nach Projekt, 'pu' = Projekt › Unterkategorie
+const UK_ALLE = '__uk_alle__', UK_OHNE_WERT = '__uk_ohne__';   // Werte der Unterkategorie-Auswahl
 let ukFilter = null; // Einzelprojekt: null = alle Unterkategorien, '' = nur ohne Unterkategorie, sonst Name
 
 // ── HILFSFUNKTIONEN ───────────────────────────────────────────────────────────
@@ -272,6 +275,7 @@ function fuelleProjekte(liste){
   let wunsch = vorher;
   if(!wunsch){ try{ wunsch = localStorage.getItem(LAST_PROJEKT_KEY) || ''; }catch(e){} }
   if(wunsch && (wunsch === ALLE || az.includes(wunsch))) sel.value = wunsch;
+  fuelleUkAuswahl();
 }
 async function ladeProjekte(){
   try{
@@ -326,7 +330,7 @@ async function erstelleReport(){
     report.skriptAlt = (report.leist.length + report.beric.length) > 0 && ![...report.leist, ...report.beric].some(x => 'unterkategorie' in x);   // Report-Skript kennt das Feld noch nicht
     normalisiereUnterkategorien(report.leist, report.beric);
     report.leistAll = report.leist; report.bericAll = report.beric;   // ungefiltert; der Unterkategorie-Filter wirkt auf leist/beric
-    ukFilter = null;
+    ukFilter = alle ? null : ukAusAuswahl();   // Auswahl unter dem Projekt gilt gleich beim Erstellen
     if(alle){
       if(data.alle !== true) throw new Error('Das Backend kennt den Gesamtauszug noch nicht – bitte ProjektReport.gs in Apps Script aktualisieren und neu bereitstellen.');
       normalisiereProjekte(report.leist, report.beric);
@@ -386,6 +390,7 @@ function wendeUkFilterAn(r){
 function waehleUk(i){
   const namen = ukNamen(report);
   ukFilter = i < 0 ? null : (i >= namen.length ? '' : namen[i]);
+  syncUkAuswahl();
   renderReport();
 }
 function renderUkFilter(r){
@@ -396,6 +401,31 @@ function renderUkFilter(r){
     namen.map((n, i) => chip(ukFilter === n, n, i)).join('') +
     chip(ukFilter === '', 'Ohne Unterkategorie', namen.length) + `</div></div>`;
 }
+// Auswahlfeld unter dem Projekt: nur bei einem einzelnen Projekt mit angelegten Unterkategorien
+function fuelleUkAuswahl(zuruecksetzen){
+  const sel = document.getElementById('ukSel'), grp = document.getElementById('ukGroup');
+  const pv = document.getElementById('projekt').value;
+  const namen = (pv && pv !== ALLE) ? ukNamen({ alle:false, projekt:pv, leist:[], beric:[] }) : [];
+  if(!namen.length){ grp.style.display = 'none'; sel.innerHTML = ''; return; }
+  const vorher = zuruecksetzen ? '' : sel.value;
+  sel.innerHTML = `<option value="${UK_ALLE}">Alle Unterkategorien</option>` +
+    namen.map(n => `<option>${esc(n)}</option>`).join('') +
+    `<option value="${UK_OHNE_WERT}">Ohne Unterkategorie</option>`;
+  sel.value = [...sel.options].some(o => o.value === vorher) ? vorher : UK_ALLE;
+  grp.style.display = '';
+}
+// Gewählte Unterkategorie → Filterwert (null = alle, '' = ohne, sonst Name)
+function ukAusAuswahl(){
+  if(document.getElementById('ukGroup').style.display === 'none') return null;
+  const v = document.getElementById('ukSel').value;
+  return v === UK_OHNE_WERT ? '' : (!v || v === UK_ALLE) ? null : v;
+}
+function syncUkAuswahl(){
+  const sel = document.getElementById('ukSel');
+  const wert = ukFilter === null ? UK_ALLE : ukFilter === '' ? UK_OHNE_WERT : ukFilter;
+  if([...sel.options].some(o => o.value === wert)) sel.value = wert;
+}
+document.getElementById('projekt').addEventListener('change', () => fuelleUkAuswahl(true));
 function ukLabel(v){ return v === null ? '' : (v === '' ? OHNE_UK : v); }
 // Pausen als eigene Minus-Zeilen („Tätigkeit" = Pause): Summen mindern sich, die Tätigkeiten bleiben brutto
 const PAUSE_KAT = 'Pause';
@@ -757,8 +787,6 @@ function exportBerichteCsv(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-const APP_VERSION = 61;   // gleiche Nummer wie CACHE_VERSION in sw.js
-document.getElementById('verInfo').textContent = 'Version ' + APP_VERSION;
 renderZrChips();
 waehleZeitraum('monat');
 if(!TOKEN){
