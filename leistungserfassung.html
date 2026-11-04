@@ -50,6 +50,8 @@
   .projekt-banner.kein{background:#C2410C}
   .projekt-banner.kein .projekt-banner-name{display:none}
   .projekt-banner.kein.nichtnoetig{background:#6B7280}   /* Tätigkeit ohne Projektpflicht: neutral statt Warnfarbe */
+  .uk-block{margin-top:12px}
+  .uk-link{background:none;border:0;padding:4px 0;font:inherit;font-size:13px;font-weight:600;color:var(--green);cursor:pointer}
   .finput.hinweis{border-color:var(--orange);box-shadow:0 0 0 3px var(--orange-light)}
   /* Rückfrage „Kein Projekt ausgewählt" */
   .modal-overlay{position:fixed;inset:0;background:rgba(17,24,39,.55);display:none;align-items:center;justify-content:center;padding:20px;z-index:300}
@@ -155,6 +157,12 @@
       <label class="flabel" id="leProjektLabel">Projekt</label>
       <select class="finput" id="leProjekt"><option value="">– kein Projekt / nicht zutreffend –</option></select>
       <input type="text" class="finput" id="leProjektNeu" placeholder="Neuen Projektnamen eintragen" style="display:none;margin-top:8px">
+    <div class="fgroup uk-block" id="leUk" style="display:none">
+      <label class="flabel" id="leUkLabel">Unterkategorie</label>
+      <select class="finput" id="leUkSel"></select>
+      <input type="text" class="finput" id="leUkNeu" maxlength="80" placeholder="Name der neuen Unterkategorie" autocomplete="off" style="display:none;margin-top:8px">
+      <button type="button" class="uk-link" id="leUkLink">+ Unterkategorie anlegen</button>
+    </div>
     </div>
     <button class="btn-primary" id="bestaetigenBtn" style="margin-top:16px" onclick="bestaetigeAuswahl()">Starten</button>
   </div>
@@ -190,6 +198,12 @@
       <label class="flabel" id="editProjektLabel">Projekt</label>
       <select class="finput" id="editProjekt"><option value="">– kein Projekt / nicht zutreffend –</option></select>
       <input type="text" class="finput" id="editProjektNeu" placeholder="Neuen Projektnamen eintragen" style="display:none;margin-top:8px">
+    <div class="fgroup uk-block" id="editUk" style="display:none">
+      <label class="flabel" id="editUkLabel">Unterkategorie</label>
+      <select class="finput" id="editUkSel"></select>
+      <input type="text" class="finput" id="editUkNeu" maxlength="80" placeholder="Name der neuen Unterkategorie" autocomplete="off" style="display:none;margin-top:8px">
+      <button type="button" class="uk-link" id="editUkLink">+ Unterkategorie anlegen</button>
+    </div>
     </div>
     <div class="fgroup" style="margin-top:14px;display:flex;gap:8px">
       <div style="flex:1">
@@ -228,6 +242,12 @@
       <label class="flabel">Projekt / Baustelle</label>
       <select class="finput" id="bbProjekt"><option value="">– auswählen –</option></select>
       <input type="text" class="finput" id="bbProjektNeu" placeholder="Neuen Projektnamen eintragen" style="display:none;margin-top:8px">
+    <div class="fgroup uk-block" id="bbUk" style="display:none">
+      <label class="flabel" id="bbUkLabel">Unterkategorie</label>
+      <select class="finput" id="bbUkSel"></select>
+      <input type="text" class="finput" id="bbUkNeu" maxlength="80" placeholder="Name der neuen Unterkategorie" autocomplete="off" style="display:none;margin-top:8px">
+      <button type="button" class="uk-link" id="bbUkLink">+ Unterkategorie anlegen</button>
+    </div>
     </div>
     <div class="fgroup">
       <label class="flabel">Datum</label>
@@ -455,8 +475,15 @@ function ladeVorauswahl(){
     return v.mitarbeiter === aktuellerMA ? (v.projekt || '') : null;
   }catch(e){ return null; }
 }
-function speichereVorauswahl(projekt){
-  try{ localStorage.setItem(VORAUSWAHL_KEY, JSON.stringify({ mitarbeiter: aktuellerMA, projekt: projekt || '', datum: heuteLokal() })); }catch(e){}
+// Unterkategorie zur Vorauswahl ('' wenn keine)
+function ladeVorauswahlUk(){
+  try{
+    const v = JSON.parse(localStorage.getItem(VORAUSWAHL_KEY) || 'null');
+    return (v && v.datum === heuteLokal() && v.mitarbeiter === aktuellerMA) ? (v.unterkategorie || '') : '';
+  }catch(e){ return ''; }
+}
+function speichereVorauswahl(projekt, unterkategorie){
+  try{ localStorage.setItem(VORAUSWAHL_KEY, JSON.stringify({ mitarbeiter: aktuellerMA, projekt: projekt || '', unterkategorie: unterkategorie || '', datum: heuteLokal() })); }catch(e){}
 }
 function loescheVorauswahl(){
   try{ localStorage.removeItem(VORAUSWAHL_KEY); }catch(e){}
@@ -611,12 +638,113 @@ async function pruefeAktuelleRunde(){
     const data = await res.json();
     if(aktuellerMA !== name || aktuelleRunde) return;
     if(data.status === 'ok' && data.runde){
-      aktuelleRunde = { id: data.runde.id, mitarbeiter: name, kategorie: data.runde.kategorie, projekt: data.runde.projekt, start: data.runde.start };
+      aktuelleRunde = { id: data.runde.id, mitarbeiter: name, kategorie: data.runde.kategorie, projekt: data.runde.projekt, unterkategorie: data.runde.unterkategorie || '', start: data.runde.start };
       speichereLokaleRunde(aktuelleRunde);
       zeigeRunde();
     }
   }catch(e){ console.warn('Konnte offene Runde nicht prüfen:', e); }
 }
+
+// ── PROJEKT-UNTERKATEGORIEN ────────────────────────────────────────────────────
+// Optionales Feld pro Projekt. Hat das Projekt Unterkategorien, gibt es eine Auswahl; sonst nur den kleinen Link
+// „+ Unterkategorie anlegen". Gespeichert wird der Text (Rechtschreibung vorhandener Einträge wird übernommen).
+const UK_CACHE_KEY = 'gh3_le_unterkat_cache';
+let ukMap = {};   // { "Projektname": ["Unterkategorie", …] }
+try{ const c = JSON.parse(localStorage.getItem(UK_CACHE_KEY) || '{}'); if(c && typeof c === 'object' && !Array.isArray(c)) ukMap = c; }catch(e){}
+const UK_BLOECKE = {
+  le:   { projekt:'leProjekt',   neu:'leProjektNeu' },
+  edit: { projekt:'editProjekt', neu:'editProjektNeu' },
+  bb:   { projekt:'bbProjekt',   neu:'bbProjektNeu' }
+};
+function ukBereinige(t){ return String(t == null ? '' : t).replace(/\s+/g, ' ').trim().substring(0, 80); }
+function ukListe(projekt){
+  const p = String(projekt || '').trim().toLowerCase();
+  if(!p) return [];
+  const key = Object.keys(ukMap).find(k => k.trim().toLowerCase() === p);
+  return key && Array.isArray(ukMap[key]) ? ukMap[key] : [];
+}
+function ukSpeichereCache(){ try{ localStorage.setItem(UK_CACHE_KEY, JSON.stringify(ukMap)); }catch(e){} }
+// Rendert den Block neu. o.reset = leeren (Projekt gewechselt), o.wert = bestimmten Wert setzen, sonst Eingaben behalten.
+function ukRender(b, o){
+  o = o || {};
+  const cfg = UK_BLOECKE[b];
+  const blk = document.getElementById(b+'Uk'), sel = document.getElementById(b+'UkSel'),
+        neu = document.getElementById(b+'UkNeu'), link = document.getElementById(b+'UkLink'),
+        lab = document.getElementById(b+'UkLabel');
+  if(!blk) return;
+  const pv = document.getElementById(cfg.projekt).value;
+  if(pv === ''){ blk.style.display = 'none'; sel.innerHTML = ''; neu.value = ''; neu.style.display = 'none'; return; }   // ohne Projekt keine Unterkategorie
+  const liste = pv === '__new__' ? [] : ukListe(pv);
+  let selVal, txt, txtOffen;
+  if(o.reset){ selVal = ''; txt = ''; txtOffen = false; }
+  else if(o.wert !== undefined){
+    const w = ukBereinige(o.wert);
+    const treffer = liste.find(x => x.toLowerCase() === w.toLowerCase());
+    if(!w){ selVal = ''; txt = ''; txtOffen = false; }
+    else if(treffer){ selVal = treffer; txt = ''; txtOffen = false; }
+    else { selVal = '__new__'; txt = w; txtOffen = true; }
+  } else { selVal = sel.value; txt = neu.value; txtOffen = neu.style.display !== 'none'; }
+  blk.style.display = '';
+  if(liste.length){
+    sel.style.display = ''; link.style.display = 'none'; lab.style.display = '';
+    sel.innerHTML = '<option value="">– keine –</option>' + liste.map(x => `<option>${esc(x)}</option>`).join('') + '<option value="__new__">+ Neue Unterkategorie…</option>';
+    if(selVal && [...sel.options].some(op => op.value === selVal)) sel.value = selVal;
+    else sel.value = (txtOffen || txt) ? '__new__' : '';
+    const neuOffen = sel.value === '__new__';
+    neu.style.display = neuOffen ? '' : 'none';
+    neu.value = neuOffen ? txt : '';
+  } else {
+    sel.style.display = 'none'; sel.innerHTML = '';
+    const offen = txtOffen || !!txt || selVal === '__new__';
+    neu.style.display = offen ? '' : 'none';
+    neu.value = offen ? txt : '';
+    link.style.display = offen ? 'none' : '';
+    lab.style.display = offen ? '' : 'none';
+  }
+}
+// Gewählte/eingetragene Unterkategorie ('' = keine). Vorhandene Schreibweise (ohne Groß-/Kleinschreibung) wird übernommen.
+function ukWert(b){
+  const cfg = UK_BLOECKE[b];
+  const blk = document.getElementById(b+'Uk'), sel = document.getElementById(b+'UkSel'), neu = document.getElementById(b+'UkNeu');
+  if(!blk || blk.style.display === 'none') return '';
+  let txt;
+  if(sel.style.display !== 'none'){ txt = sel.value === '__new__' ? neu.value : sel.value; }
+  else txt = neu.style.display !== 'none' ? neu.value : '';
+  txt = ukBereinige(txt);
+  if(!txt) return '';
+  const pv = document.getElementById(cfg.projekt).value;
+  const treffer = pv === '__new__' ? null : ukListe(pv).find(x => x.toLowerCase() === txt.toLowerCase());
+  return treffer || txt;
+}
+function ukAlleAktualisieren(){ Object.keys(UK_BLOECKE).forEach(b => ukRender(b)); }
+// Neue Unterkategorie sofort lokal merken (der Server legt sie beim Senden im Tab an)
+function merkeNeueUnterkategorie(projekt, uk){
+  projekt = String(projekt || '').trim(); uk = ukBereinige(uk);
+  if(!projekt || !uk) return;
+  if(ukListe(projekt).some(x => x.toLowerCase() === uk.toLowerCase())) return;
+  const key = Object.keys(ukMap).find(k => k.trim().toLowerCase() === projekt.toLowerCase()) || projekt;
+  ukMap[key] = (Array.isArray(ukMap[key]) ? ukMap[key] : []).concat([uk]);
+  ukSpeichereCache();
+  ukAlleAktualisieren();
+}
+// Anzeige „Projekt › Unterkategorie"
+function projektAnzeige(projekt, uk){
+  projekt = String(projekt || '').trim(); uk = String(uk || '').trim();
+  return uk && projekt ? projekt + ' › ' + uk : projekt;
+}
+Object.keys(UK_BLOECKE).forEach(b => {
+  document.getElementById(b+'UkLink').addEventListener('click', () => {
+    document.getElementById(b+'UkLink').style.display = 'none';
+    document.getElementById(b+'UkLabel').style.display = '';
+    const n = document.getElementById(b+'UkNeu'); n.style.display = ''; n.focus();
+  });
+  document.getElementById(b+'UkSel').addEventListener('change', function(){
+    const n = document.getElementById(b+'UkNeu');
+    n.style.display = this.value === '__new__' ? '' : 'none';
+    if(this.value === '__new__') n.focus(); else n.value = '';
+  });
+  document.getElementById(UK_BLOECKE[b].projekt).addEventListener('change', () => ukRender(b, { reset:true }));
+});
 
 // ── PROJEKTE LADEN ─────────────────────────────────────────────────────────────
 const PROJ_CACHE_KEY = 'gh3_le_projekte_cache';
@@ -644,6 +772,7 @@ function fuelleProjekte(liste){
     }
     if(wunsch && [...bb.options].some(o => o.value === wunsch)){ bb.value = wunsch; bbProjektVorbelegt = true; }
   }
+  ukAlleAktualisieren();
 }
 let bbProjektVorbelegt = false;
 // Neu eingetragenes Projekt sofort in die Liste aufnehmen (steht dann ganz oben)
@@ -666,6 +795,9 @@ async function ladeProjekte(){
     const data = await res.json();
     const liste = data.projekte || [];
     try{ localStorage.setItem(PROJ_CACHE_KEY, JSON.stringify(liste)); }catch(e){}
+    if(data.unterkategorien && typeof data.unterkategorien === 'object' && !Array.isArray(data.unterkategorien)){
+      ukMap = data.unterkategorien; ukSpeichereCache();   // ältere Skript-Version liefert nichts → bisherige Liste bleibt
+    }
     fuelleProjekte(liste);
   }catch(e){ console.warn('Projektliste konnte nicht geladen werden:', e); }
 }
@@ -709,7 +841,7 @@ function renderRundenHeute(runden){
     <div class="runde-row" onclick="oeffneBearbeiten('${esc(r.id)}')">
       <div>
         <div class="runde-info">${esc(r.kategorie)}</div>
-        ${r.projekt ? `<div class="runde-projekt">${esc(r.projekt)}</div>` : ''}
+        ${r.projekt ? `<div class="runde-projekt">${esc(projektAnzeige(r.projekt, r.unterkategorie))}</div>` : ''}
         ${r.was ? `<div class="runde-projekt">„${esc(r.was)}"</div>` : ''}
       </div>
       <div>
@@ -760,6 +892,7 @@ function oeffneBearbeiten(id){
   projektSel.value = [...projektSel.options].some(o => o.value === runde.projekt) ? runde.projekt : '';
   document.getElementById('editProjektNeu').style.display = 'none';
   document.getElementById('editProjektNeu').value = '';
+  ukRender('edit', { wert: runde.unterkategorie || '' });
 
   document.getElementById('editStart').value = formatZeitInput(runde.start);
   document.getElementById('editEnde').value = formatZeitInput(runde.ende);
@@ -818,10 +951,12 @@ function speichereBearbeitung(){
   const id = bearbeiteteRunde.id;
   const pauseMin = bereinigePause(document.getElementById('editPause').value);
   const was = document.getElementById('editWas').value.trim();
-  enqueue({ type:'leistung_update', token: TOKEN, id, kategorie, projekt, startZeit: neuStart.toISOString(), endZeit: neuEnde.toISOString(), pauseMin, was });
+  const unterkategorie = projekt ? ukWert('edit') : '';
+  enqueue({ type:'leistung_update', token: TOKEN, id, kategorie, projekt, startZeit: neuStart.toISOString(), endZeit: neuEnde.toISOString(), pauseMin, was, unterkategorie });
+  merkeNeueUnterkategorie(projekt, unterkategorie);
   // Anzeige sofort anpassen, der Abgleich mit dem Sheet folgt nach dem Senden
   letzteRundenHeute = letzteRundenHeute.map(r => r.id === id
-    ? Object.assign({}, r, { kategorie, projekt, pauseMin, was, start: neuStart.toISOString(), ende: neuEnde.toISOString(), dauerMin: Math.round((neuEnde - neuStart) / 60000) })
+    ? Object.assign({}, r, { kategorie, projekt, unterkategorie, pauseMin, was, start: neuStart.toISOString(), ende: neuEnde.toISOString(), dauerMin: Math.round((neuEnde - neuStart) / 60000) })
     : r);
   renderRundenHeute(letzteRundenHeute);
   schliesseBearbeiten();
@@ -857,6 +992,10 @@ function zeigeAuswahl(modus){
   projektSel.value = (vorauswahl && [...projektSel.options].some(o => o.value === vorauswahl)) ? vorauswahl : '';
   document.getElementById('leProjektNeu').style.display = 'none';
   document.getElementById('leProjektNeu').value = '';
+  // Unterkategorie: gehört zur Vorauswahl (oder zur laufenden Runde beim Wechsel auf demselben Projekt)
+  let vorUk = ladeVorauswahlUk();
+  if(ladeVorauswahl() === null && modus === 'wechsel' && aktuelleRunde) vorUk = aktuelleRunde.unterkategorie || '';
+  ukRender('le', { wert: projektSel.value ? vorUk : '' });
   document.getElementById('bestaetigenBtn').textContent = modus === 'start' ? 'Starten' : 'Wechseln';
   document.getElementById('auswahlCard').style.display = '';
   document.getElementById('startWrap').style.display = 'none';
@@ -876,6 +1015,7 @@ function bestaetigeAuswahl(){
   let projekt = document.getElementById('leProjekt').value;
   let projektIstNeu = false;
   if(projekt === '__new__'){ projekt = document.getElementById('leProjektNeu').value.trim(); projektIstNeu = true; }
+  const unterkategorie = projekt ? ukWert('le') : '';
 
   if(auswahlModus === 'wechsel' && istVeraltet(aktuelleRunde)){ zeigeVeraltet(); return; }
   // Rückfrage, wenn für diese Tätigkeit ein Projekt erwartet wird, aber keins gewählt ist
@@ -885,11 +1025,11 @@ function bestaetigeAuswahl(){
   const jetzt = new Date().toISOString();   // Zeitpunkt des Tippens – gilt auch, wenn davor noch das Pause-Fenster kommt
   // Wechsel auf ein anderes Projekt = Einsatz auf dem bisherigen Projekt ist beendet → Pause/Beschreibung erfragen
   if(auswahlModus === 'wechsel' && aktuelleRunde && (aktuelleRunde.projekt || '').trim() !== (projekt || '').trim()){
-    zeigePauseModal({ art:'wechsel', jetzt, kategorie, projekt, projektIstNeu });
+    zeigePauseModal({ art:'wechsel', jetzt, kategorie, projekt, projektIstNeu, unterkategorie });
     return;
   }
   if(!sperre()) return;
-  fuehreStartAus(kategorie, projekt, projektIstNeu, jetzt, null);
+  fuehreStartAus(kategorie, projekt, projektIstNeu, jetzt, null, unterkategorie);
 }
 
 // ── EINSATZ (aufeinanderfolgende Leistungen auf demselben Projekt) ─────────────
@@ -920,25 +1060,27 @@ function sendeNotizen(notizen){
 }
 
 // abschluss = { pauseMin, was, notizen } für den bisherigen Einsatz (nur bei Projektwechsel), sonst null
-function fuehreStartAus(kategorie, projekt, projektIstNeu, jetzt, abschluss){
+function fuehreStartAus(kategorie, projekt, projektIstNeu, jetzt, abschluss, unterkategorie){
+  unterkategorie = unterkategorie || '';
   const id = neueId();
-  speichereVorauswahl(projekt);   // bleibt Vorauswahl der nächsten Runde, bis „Fertig"
+  speichereVorauswahl(projekt, unterkategorie);   // bleibt Vorauswahl der nächsten Runde, bis „Fertig"
   const neuerPunkt = { id, kategorie, start: jetzt };
   let einsatz = [neuerPunkt];   // neuer Einsatz …
 
   if(auswahlModus === 'wechsel' && aktuelleRunde){
-    const p = { type:'leistung_wechsel', token: TOKEN, id: aktuelleRunde.id, mitarbeiter: aktuellerMA, endZeit: jetzt, neue: { id, kategorie, projekt, startZeit: jetzt } };
+    const p = { type:'leistung_wechsel', token: TOKEN, id: aktuelleRunde.id, mitarbeiter: aktuellerMA, endZeit: jetzt, neue: { id, kategorie, projekt, unterkategorie, startZeit: jetzt } };
     if(abschluss){ p.pauseMin = abschluss.pauseMin; p.was = abschluss.was; }
     enqueue(p);
     if(abschluss) sendeNotizen(abschluss.notizen);
     else einsatz = einsatzFuerFenster(jetzt).map(({ id, kategorie, start }) => ({ id, kategorie, start })).concat([neuerPunkt]);   // … oder gleicher Einsatz geht weiter
   } else {
-    enqueue({ type:'leistung_start', token: TOKEN, id, mitarbeiter: aktuellerMA, kategorie, projekt, startZeit: jetzt });
+    enqueue({ type:'leistung_start', token: TOKEN, id, mitarbeiter: aktuellerMA, kategorie, projekt, unterkategorie, startZeit: jetzt });
   }
   speichereEinsatz(einsatz);
-  aktuelleRunde = { id, mitarbeiter: aktuellerMA, kategorie, projekt, start: jetzt };
+  aktuelleRunde = { id, mitarbeiter: aktuellerMA, kategorie, projekt, unterkategorie, start: jetzt };
   speichereLokaleRunde(aktuelleRunde);
   if(projektIstNeu) merkeNeuesProjekt(projekt);
+  merkeNeueUnterkategorie(projekt, unterkategorie);
   zeigeTimer();   // sofort – das Senden läuft im Hintergrund
 }
 
@@ -1026,7 +1168,7 @@ function pauseModalSpeichern(){
   const abschluss = { pauseMin, was: letzte.was, notizen: texte.slice(0, -1) };   // die letzte Leistung wird mit Stop/Wechsel abgeschlossen
   schliessePauseModal();
   if(k.art === 'fertig') fuehreFertigAus(k.jetzt, abschluss);
-  else fuehreStartAus(k.kategorie, k.projekt, k.projektIstNeu, k.jetzt, abschluss);
+  else fuehreStartAus(k.kategorie, k.projekt, k.projektIstNeu, k.jetzt, abschluss, k.unterkategorie);
 }
 document.getElementById('pauseModalOk').addEventListener('click', pauseModalSpeichern);
 document.getElementById('pauseModalZurueck').addEventListener('click', schliessePauseModal);
@@ -1067,7 +1209,7 @@ function zeigeVeraltet(){
   const r = aktuelleRunde;
   const start = new Date(r.start);
   document.getElementById('staleInfo').textContent =
-    r.kategorie + (r.projekt ? ' · ' + r.projekt : '') + ' – gestartet am ' +
+    r.kategorie + (r.projekt ? ' · ' + projektAnzeige(r.projekt, r.unterkategorie) : '') + ' – gestartet am ' +
     start.toLocaleDateString('de-DE') + ' um ' + formatUhrzeit(r.start) + ' Uhr und nie beendet.';
   const feld = document.getElementById('staleEnde');
   feld.min = lokalInput(start);
@@ -1093,7 +1235,7 @@ function staleSpeichern(){
   if(ende > new Date()){ showToast('⚠️ Ende darf nicht in der Zukunft liegen'); return; }
   if(ende - start > 16 * 3600 * 1000){ showToast('⚠️ Mehr als 16 Std. nach dem Start – bitte prüfen'); return; }
   if(!sperre()) return;
-  enqueue({ type:'leistung_update', token: TOKEN, id: aktuelleRunde.id, kategorie: aktuelleRunde.kategorie, projekt: aktuelleRunde.projekt || '', startZeit: aktuelleRunde.start, endZeit: ende.toISOString() });
+  enqueue({ type:'leistung_update', token: TOKEN, id: aktuelleRunde.id, kategorie: aktuelleRunde.kategorie, projekt: aktuelleRunde.projekt || '', unterkategorie: aktuelleRunde.unterkategorie, startZeit: aktuelleRunde.start, endZeit: ende.toISOString() });
   beendeAlteRunde();
   showToast('✅ Leistung beendet');
 }
@@ -1121,7 +1263,7 @@ function zeigeTimer(){
   banner.classList.toggle('kein', !projekt);
   banner.classList.toggle('nichtnoetig', egal);
   document.getElementById('projektBannerLabel').textContent = projekt ? 'Läuft auf Projekt' : (egal ? 'Kein Projekt (nicht nötig)' : 'Kein Projekt ausgewählt');
-  document.getElementById('projektBannerName').textContent = projekt;
+  document.getElementById('projektBannerName').textContent = projektAnzeige(projekt, aktuelleRunde.unterkategorie);
   document.getElementById('timerKategorieLabel').textContent = aktuelleRunde.kategorie;
   document.getElementById('timerWarnung').textContent = '⚠️ Läuft seit über 12 Std. – bitte beenden und die Endzeit angeben.';
   clearInterval(timerInterval);
@@ -1298,6 +1440,7 @@ async function submitBericht(){
   const projektIstNeu = (projekt === '__new__');
   if(projektIstNeu){ projekt = document.getElementById('bbProjektNeu').value.trim(); }
   if(!projekt){ showToast('⚠️ Bitte Projekt auswählen oder eintragen'); return; }
+  const unterkategorie = ukWert('bb');
 
   const datum = document.getElementById('bbDatum').value;
   if(!datum){ showToast('⚠️ Bitte Datum wählen'); return; }
@@ -1318,6 +1461,7 @@ async function submitBericht(){
     token: TOKEN,
     date: datum,
     projekt,
+    unterkategorie,
     erfasstVon: aktuellerMA,
     gruppen,
     fahrten,
@@ -1335,6 +1479,7 @@ async function submitBericht(){
 
   try{ localStorage.setItem('gh3_bb_lastProjekt', projekt); }catch(e){}
   if(projektIstNeu) merkeNeuesProjekt(projekt);
+  merkeNeueUnterkategorie(projekt, unterkategorie);
 
   showToast('✅ Baustellenbericht gespeichert');
   resetBerichtForm();
@@ -1352,6 +1497,7 @@ function resetBerichtForm(){
   document.getElementById('bbProjektNeu').value = '';
   document.getElementById('bbProjektNeu').style.display = 'none';
   document.getElementById('bbProjekt').value = '';
+  ukRender('bb', { reset:true });
   document.getElementById('bbDatum').value = heuteLokal();
 }
 
