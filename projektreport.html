@@ -35,6 +35,8 @@
   .finput{width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--text)}
   .finput:focus{outline:none;border-color:var(--blue)}
   select.finput{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;cursor:pointer}
+  .ukfilter{margin-bottom:14px}
+  .ukfilter .flabel{margin-bottom:6px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .chip-group{display:flex;flex-wrap:wrap;gap:6px}
   .chip{padding:8px 13px;border-radius:999px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:background .1s,color .1s}
@@ -188,10 +190,12 @@ const PROJ_CACHE_KEY = 'gh3_rp_projekte_cache';
 const LAST_PROJEKT_KEY = 'gh3_rp_lastProjekt';
 const ALLE = '__alle__';            // Wert der Auswahl „Alle Projekte"
 const OHNE = 'Ohne Projekt';        // Anzeigename für Leistungen ohne Projekt
+const OHNE_UK = 'ohne Unterkategorie';   // Anzeigename für Leistungen/Berichte ohne Projekt-Unterkategorie
 const MONATE = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 
 let report = null;   // { projekt, alle, von, bis, leist, beric, erstellt }
-let ansicht = 'ma';  // Gesamtauszug: 'ma' = nach Mitarbeiter, 'pr' = nach Projekt
+let ansicht = 'ma';  // Gesamtauszug: 'ma' = nach Mitarbeiter, 'pr' = nach Projekt, 'pu' = Projekt › Unterkategorie
+let ukFilter = null; // Einzelprojekt: null = alle Unterkategorien, '' = nur ohne Unterkategorie, sonst Name
 
 // ── HILFSFUNKTIONEN ───────────────────────────────────────────────────────────
 function esc(s){
@@ -310,6 +314,9 @@ async function erstelleReport(){
       hinweise: data.hinweise || [],
       erstellt: new Date()
     };
+    normalisiereUnterkategorien(report.leist, report.beric);
+    report.leistAll = report.leist; report.bericAll = report.beric;   // ungefiltert; der Unterkategorie-Filter wirkt auf leist/beric
+    ukFilter = null;
     if(alle){
       if(data.alle !== true) throw new Error('Das Backend kennt den Gesamtauszug noch nicht – bitte ProjektReport.gs in Apps Script aktualisieren und neu bereitstellen.');
       normalisiereProjekte(report.leist, report.beric);
@@ -330,11 +337,47 @@ async function erstelleReport(){
 
 // ── AUSWERTUNG ────────────────────────────────────────────────────────────────
 function katGruppe(k){ return String(k || '').split(':')[0].trim() || '–'; }
+// ── PROJEKT-UNTERKATEGORIEN ───────────────────────────────────────────────────
+// Schreibweisen je Projekt vereinheitlichen (Groß-/Kleinschreibung, Leerzeichen); fehlendes Feld = ''
+function normalisiereUnterkategorien(...listen){
+  const gesehen = new Map();
+  listen.forEach(liste => liste.forEach(x => {
+    const roh = String(x.unterkategorie == null ? '' : x.unterkategorie).replace(/\s+/g, ' ').trim();
+    if(!roh){ x.unterkategorie = ''; return; }
+    const key = String(x.projekt || '').trim().toLowerCase() + '\u0001' + roh.toLowerCase();
+    if(!gesehen.has(key)) gesehen.set(key, roh);
+    x.unterkategorie = gesehen.get(key);
+  }));
+}
+function hatUkDaten(r){ return [...(r.leistAll || r.leist), ...(r.bericAll || r.beric)].some(x => x.unterkategorie); }
+function ukNamen(r){
+  return [...new Set([...(r.leistAll || r.leist), ...(r.bericAll || r.beric)].map(x => x.unterkategorie).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
+}
+// Filter anwenden (nur Einzelprojekt): wirkt auf Leistungen und Baustellenberichte
+function wendeUkFilterAn(r){
+  const passt = x => ukFilter === null || (x.unterkategorie || '') === ukFilter;
+  r.leist = (r.leistAll || r.leist).filter(passt);
+  r.beric = (r.bericAll || r.beric).filter(passt);
+}
+function waehleUk(i){
+  const namen = ukNamen(report);
+  ukFilter = i < 0 ? null : (i >= namen.length ? '' : namen[i]);
+  renderReport();
+}
+function renderUkFilter(r){
+  const namen = ukNamen(r);
+  const chip = (aktiv, label, i) => `<button type="button" class="chip ${aktiv ? 'active' : ''}" onclick="waehleUk(${i})">${esc(label)}</button>`;
+  return `<div class="ukfilter noprint"><label class="flabel">Unterkategorie</label><div class="chip-group">` +
+    chip(ukFilter === null, 'Alle', -1) +
+    namen.map((n, i) => chip(ukFilter === n, n, i)).join('') +
+    chip(ukFilter === '', 'Ohne Unterkategorie', namen.length) + `</div></div>`;
+}
+function ukLabel(v){ return v === null ? '' : (v === '' ? OHNE_UK : v); }
 // Pausen als eigene Minus-Zeilen („Tätigkeit" = Pause): Summen mindern sich, die Tätigkeiten bleiben brutto
 const PAUSE_KAT = 'Pause';
 function mitPausen(fertig){
   const pausen = fertig.filter(l => l.pauseMin > 0).map(l => ({
-    projekt: l.projekt, mitarbeiter: l.mitarbeiter, kategorie: PAUSE_KAT, tag: l.tag,
+    projekt: l.projekt, unterkategorie: l.unterkategorie || '', mitarbeiter: l.mitarbeiter, kategorie: PAUSE_KAT, tag: l.tag,
     start: l.start, ende: l.ende, dauerMin: -l.pauseMin, offen: false, istPause: true
   }));
   return fertig.concat(pausen);
@@ -343,6 +386,11 @@ function summiere(liste, schluessel){
   const m = new Map();
   liste.forEach(l => m.set(schluessel(l), (m.get(schluessel(l)) || 0) + l.dauerMin));
   return [...m.entries()].sort((a, b) => b[1] - a[1]);
+}
+// Je Unterkategorie summieren; „ohne Unterkategorie" steht immer am Ende
+function summiereUk(liste){
+  return summiere(liste, l => l.unterkategorie || OHNE_UK)
+    .sort((a, b) => (a[0] === OHNE_UK) - (b[0] === OHNE_UK) || b[1] - a[1] || a[0].localeCompare(b[0], 'de'));
 }
 function berechne(r){
   const leist = r.leist.map(l => Object.assign({}, l, { tag: String(l.start).slice(0, 10) }));
@@ -358,9 +406,11 @@ function berechne(r){
   }));
   const tage = [...new Set([...leist.map(l => l.tag), ...r.beric.map(b => b.datum)])].filter(Boolean).sort();
   const tageMitLeistung = new Set(leist.map(l => l.tag));
-  const tageMitBericht = new Set(r.beric.map(b => b.datum));
+  const tageMitBericht = new Set((r.bericAll || r.beric).map(b => b.datum));   // Bericht gilt für den Tag, auch wenn er einer anderen Unterkategorie zugeordnet ist
   return {
     leist, fertig: fertigP, gesamtMin, pauseMin, maschinen, maschinenStd, tage,
+    hatUk: hatUkDaten(r),
+    jeUk: summiereUk(fertigP),
     jeMa: summiere(fertigP, l => l.mitarbeiter || '–'),
     jeKat: summiere(fertigP, l => katGruppe(l.kategorie)),
     offen: leist.filter(l => l.offen).length,
@@ -395,7 +445,7 @@ function renderBericht(b){
   const fotos = (b.fotos || []).filter(u => /^https?:\/\//i.test(u));
   if(fotos.length) zeilen.push(`<div class="lbl">📷 Fotos</div><div>${fotos.map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">Foto ${i+1}</a>`).join('')}</div>`);
   if(b.notizen) zeilen.push(`<div class="lbl">📝 Bemerkungen</div><div class="txt">${esc(b.notizen)}</div>`);
-  return `<div class="bericht"><div class="bericht-head">🚧 Baustellenbericht${b.erfasstVon ? ' · erfasst von ' + esc(b.erfasstVon) : ''}</div>` +
+  return `<div class="bericht"><div class="bericht-head">🚧 Baustellenbericht${b.unterkategorie ? ' · ' + esc(b.unterkategorie) : ''}${b.erfasstVon ? ' · erfasst von ' + esc(b.erfasstVon) : ''}</div>` +
     (zeilen.length ? zeilen.join('') : '<div class="empty">Ohne weitere Angaben.</div>') + `</div>`;
 }
 
@@ -404,15 +454,16 @@ function renderTag(tag, a){
   const be = report.beric.filter(b => b.datum === tag);
   const min = le.filter(l => !l.offen).reduce((s, l) => s + l.dauerMin - (l.pauseMin || 0), 0);
   const tabelle = le.length ? `
-    <table class="t">
-      <thead><tr><th>Mitarbeiter</th><th>Tätigkeit</th><th>Zeit</th><th class="num">Dauer</th></tr></thead>
+    <div class="tscroll"><table class="t">
+      <thead><tr><th>Mitarbeiter</th><th>Tätigkeit</th>${a.hatUk ? '<th>Unterkategorie</th>' : ''}<th>Zeit</th><th class="num">Dauer</th></tr></thead>
       <tbody>${le.map(l => `<tr>
         <td>${esc(l.mitarbeiter)}</td>
         <td>${esc(l.kategorie)}${l.was ? `<div class="was">${esc(l.was)}</div>` : ''}</td>
-        <td>${esc(String(l.start).slice(11))} – ${l.offen ? '<i>offen</i>' : esc(String(l.ende).slice(11))}</td>
+        ${a.hatUk ? `<td>${l.unterkategorie ? esc(l.unterkategorie) : '–'}</td>` : ''}
+        <td style="white-space:nowrap">${esc(String(l.start).slice(11))} – ${l.offen ? '<i>offen</i>' : esc(String(l.ende).slice(11))}</td>
         <td class="num">${l.offen ? '–' : fmtStd(l.dauerMin) + ' Std.'}</td></tr>` +
-        (l.pauseMin ? `<tr class="pause"><td>${esc(l.mitarbeiter)}</td><td><i>Pause</i></td><td></td><td class="num">− ${fmtStd(l.pauseMin)} Std.</td></tr>` : '')).join('')}</tbody>
-    </table>` : '<div class="empty">Keine Leistungen erfasst.</div>';
+        (l.pauseMin ? `<tr class="pause"><td>${esc(l.mitarbeiter)}</td><td><i>Pause</i></td>${a.hatUk ? '<td></td>' : ''}<td></td><td class="num">− ${fmtStd(l.pauseMin)} Std.</td></tr>` : '')).join('')}</tbody>
+    </table></div>` : '<div class="empty">Keine Leistungen erfasst.</div>';
   return `<div class="day">
     <div class="day-head"><div class="day-title">${fmtTag(tag)}</div><div class="day-sum">${le.length ? fmtStd(min) + ' Std. Personenzeit' : ''}</div></div>
     ${tabelle}${be.map(renderBericht).join('')}</div>`;
@@ -441,13 +492,14 @@ function gruppiere(liste, keyFn){
   return [...m.values()];
 }
 // absteigend nach Stunden; „Ohne Projekt" steht in der Projekt-Ebene immer am Ende
-function sortiereGruppen(arr, projektEbene){
+function sortiereGruppen(arr, ebene){
+  const letzter = ebene === 'pr' ? OHNE : (ebene === 'uk' ? OHNE_UK : null);   // „Ohne …" steht immer am Ende
   return arr.sort((a, b) => {
-    if(projektEbene){ if(a.name === OHNE && b.name !== OHNE) return 1; if(b.name === OHNE && a.name !== OHNE) return -1; }
+    if(letzter){ if(a.name === letzter && b.name !== letzter) return 1; if(b.name === letzter && a.name !== letzter) return -1; }
     return b.min - a.min || a.name.localeCompare(b.name, 'de');
   });
 }
-const EBENE = { ma: l => l.mitarbeiter || '–', pr: l => l.projekt, ka: l => katGruppe(l.kategorie) };
+const EBENE = { ma: l => l.mitarbeiter || '–', pr: l => l.projekt, ka: l => katGruppe(l.kategorie), uk: l => l.unterkategorie || OHNE_UK };
 
 function berechneAlle(r){
   const leist = r.leist.map(l => Object.assign({}, l, { tag: String(l.start).slice(0, 10) }));
@@ -462,10 +514,11 @@ function berechneAlle(r){
     const e = pe(b.projekt); e.berichte++;
     Object.keys(b.gruppen || {}).forEach(k => { e.maschStd += Number(b.gruppen[k].stunden) || 0; });
   });
-  const projektListe = sortiereGruppen([...projekte.values()], true);
+  const projektListe = sortiereGruppen([...projekte.values()], 'pr');
   const ohneMin = (projekte.get(OHNE) || { min: 0 }).min;
   return {
     leist, fertig: fertigP, gesamtMin, pauseMin, projektListe, ohneMin,
+    hatUk: hatUkDaten(r),
     projektAnzahl: projektListe.filter(p => p.name !== OHNE).length,
     maCount: new Set(fertig.map(l => l.mitarbeiter)).size,
     offen: leist.filter(l => l.offen).length,
@@ -482,12 +535,12 @@ function istGanzerMonat(von, bis){
 }
 
 function renderBaum(a){
-  const [e0, e1, e2] = ansicht === 'ma' ? ['ma', 'pr', 'ka'] : ['pr', 'ma', 'ka'];
+  const [e0, e1, e2] = ansicht === 'ma' ? ['ma', 'pr', 'ka'] : ansicht === 'pu' ? ['pr', 'uk', 'ma'] : ['pr', 'ma', 'ka'];
   if(!a.fertig.length) return '<div class="rp-card"><div class="empty">Keine abgeschlossenen Leistungen im Zeitraum.</div></div>';
-  return sortiereGruppen(gruppiere(a.fertig, EBENE[e0]), e0 === 'pr').map(g0 => {
-    const zeilen = sortiereGruppen(gruppiere(g0.items, EBENE[e1]), e1 === 'pr').map(g1 =>
+  return sortiereGruppen(gruppiere(a.fertig, EBENE[e0]), e0).map(g0 => {
+    const zeilen = sortiereGruppen(gruppiere(g0.items, EBENE[e1]), e1).map(g1 =>
       `<tr class="g1"><td>${esc(g1.name)}</td><td class="num">${fmtStdV(g1.min)} Std.</td></tr>` +
-      sortiereGruppen(gruppiere(g1.items, EBENE[e2]), false).map(g2 =>
+      sortiereGruppen(gruppiere(g1.items, EBENE[e2]), e2).map(g2 =>
         `<tr class="g2"><td>${esc(g2.name)}</td><td class="num">${fmtStdV(g2.min)} Std.</td></tr>`).join('')
     ).join('');
     return `<details class="grp"><summary><span>${esc(g0.name)}</span><span class="num">${fmtStdV(g0.min)} Std.</span></summary>` +
@@ -500,7 +553,9 @@ function waehleAnsicht(x){
   document.getElementById('baum').innerHTML = renderBaum(report.auswertung);
 }
 function ansichtChips(){
-  return [['ma', 'Nach Mitarbeiter'], ['pr', 'Nach Projekt']].map(([id, label]) =>
+  const optionen = [['ma', 'Nach Mitarbeiter'], ['pr', 'Nach Projekt']];
+  if(report && report.auswertung && report.auswertung.hatUk) optionen.push(['pu', 'Projekt › Unterkategorie']);
+  return optionen.map(([id, label]) =>
     `<button type="button" class="chip ${id === ansicht ? 'active' : ''}" onclick="waehleAnsicht('${id}')">${label}</button>`).join('');
 }
 function klappeAlle(){
@@ -570,15 +625,17 @@ function renderAlle(){
 function renderReport(){
   document.getElementById('btnAuszugCsv').style.display = 'none';
   if(report.alle) return renderAlle();
-  const r = report, a = berechne(r);
+  const r = report;
+  wendeUkFilterAn(r);
+  const a = berechne(r);
   r.auswertung = a;
   const hatDaten = a.tage.length > 0;
   let html = `
     <div class="rp-head">
       <h1>Projektreport: ${esc(r.projekt)}</h1>
       <div class="rp-meta">Zeitraum: <b>${esc(fmtZeitraum(r.von, r.bis))}</b><br>
-        Erstellt am ${fmtDatum(isoLokal(r.erstellt))} um ${pad(r.erstellt.getHours())}:${pad(r.erstellt.getMinutes())} Uhr</div>
-    </div>`;
+        ${ukFilter !== null ? 'Unterkategorie: <b>' + esc(ukLabel(ukFilter)) + '</b><br>' : ''}Erstellt am ${fmtDatum(isoLokal(r.erstellt))} um ${pad(r.erstellt.getHours())}:${pad(r.erstellt.getMinutes())} Uhr</div>
+    </div>` + (a.hatUk ? renderUkFilter(r) : '');
 
   if(!hatDaten){
     return void (document.getElementById('report').innerHTML = html +
@@ -601,6 +658,7 @@ function renderReport(){
   html += `<div class="section-title">Auswertung</div><div class="cols">` +
     renderBalken('Stunden je Mitarbeiter', a.jeMa, a.gesamtMin) +
     renderBalken('Stunden je Tätigkeit', a.jeKat, a.gesamtMin) + `</div>`;
+  if(a.hatUk && ukFilter === null) html += renderBalken('Stunden je Unterkategorie', a.jeUk, a.gesamtMin);
 
   const mk = Object.keys(a.maschinen).filter(k => a.maschinen[k] > 0).sort();
   if(mk.length){
@@ -643,8 +701,8 @@ function ladeCsv(name, zeilen){
 }
 function exportLeistungenCsv(){
   if(!report) return;
-  const kopf = ['Projekt','Datum','Mitarbeiter','Tätigkeit','Start','Ende','Brutto (Std.)','Pause (Min)','Netto (Std.)','Was gemacht'];
-  const zeilen = report.auswertung.leist.map(l => [report.alle ? l.projekt : report.projekt, fmtDatum(l.tag), l.mitarbeiter, l.kategorie,
+  const kopf = ['Projekt','Unterkategorie','Datum','Mitarbeiter','Tätigkeit','Start','Ende','Brutto (Std.)','Pause (Min)','Netto (Std.)','Was gemacht'];
+  const zeilen = report.auswertung.leist.map(l => [report.alle ? l.projekt : report.projekt, l.unterkategorie || '', fmtDatum(l.tag), l.mitarbeiter, l.kategorie,
     String(l.start).slice(11), l.offen ? '' : String(l.ende).slice(11),
     l.offen ? '' : fmtZahl(l.dauerMin / 60, 2), l.pauseMin || '', l.offen ? '' : fmtZahl((l.dauerMin - (l.pauseMin || 0)) / 60, 2), l.was || '']);
   ladeCsv(dateiBasis() + '_Leistungen.csv', [kopf, ...zeilen]);
@@ -654,20 +712,20 @@ function exportAuszugCsv(){
   if(!report || !report.alle) return;
   const m = new Map();
   report.auswertung.fertig.forEach(l => {
-    const k = [l.projekt, l.mitarbeiter || '–', katGruppe(l.kategorie)].join('\u0001');
+    const k = [l.projekt, l.unterkategorie || '', l.mitarbeiter || '–', katGruppe(l.kategorie)].join('\u0001');
     m.set(k, (m.get(k) || 0) + l.dauerMin);
   });
   const zeilen = [...m.entries()].map(([k, min]) => [...k.split('\u0001'), fmtZahl(min / 60, 2)])
-    .sort((a, b) => (a[0] === OHNE) - (b[0] === OHNE) || a[0].localeCompare(b[0], 'de') || a[1].localeCompare(b[1], 'de') || a[2].localeCompare(b[2], 'de'));
-  ladeCsv(dateiBasis() + '_Auszug.csv', [['Projekt','Mitarbeiter','Tätigkeit','Stunden (netto)'], ...zeilen]);
+    .sort((a, b) => (a[0] === OHNE) - (b[0] === OHNE) || a[0].localeCompare(b[0], 'de') || a[1].localeCompare(b[1], 'de') || a[2].localeCompare(b[2], 'de') || a[3].localeCompare(b[3], 'de'));
+  ladeCsv(dateiBasis() + '_Auszug.csv', [['Projekt','Unterkategorie','Mitarbeiter','Tätigkeit','Stunden (netto)'], ...zeilen]);
 }
 function exportBerichteCsv(){
   if(!report) return;
-  const kopf = ['Projekt','Datum','Erfasst von','Gruppe 1 Std.','Gruppe 1','Gruppe 2 Std.','Gruppe 2','Gruppe 3 Std.','Gruppe 3',
+  const kopf = ['Projekt','Unterkategorie','Datum','Erfasst von','Gruppe 1 Std.','Gruppe 1','Gruppe 2 Std.','Gruppe 2','Gruppe 3 Std.','Gruppe 3',
     'Gruppe 4 Std.','Gruppe 4','Gruppe 5 Std.','Gruppe 5','Fahrten','Belege','Fotos','Bemerkungen'];
   const zeilen = report.beric.map(b => {
     const g = k => { const x = (b.gruppen || {})[k] || {}; return [x.stunden ? fmtZahl(x.stunden, 2) : '', x.was || '']; };
-    return [report.alle ? b.projekt : report.projekt, fmtDatum(b.datum), b.erfasstVon, ...g('g1'), ...g('g2'), ...g('g3'), ...g('g4'), ...g('g5'),
+    return [report.alle ? b.projekt : report.projekt, b.unterkategorie || '', fmtDatum(b.datum), b.erfasstVon, ...g('g1'), ...g('g2'), ...g('g3'), ...g('g4'), ...g('g5'),
       b.fahrten, b.belege, (b.fotos || []).join(' '), b.notizen];
   });
   ladeCsv(dateiBasis() + '_Baustellenberichte.csv', [kopf, ...zeilen]);

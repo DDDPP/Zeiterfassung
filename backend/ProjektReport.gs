@@ -94,8 +94,9 @@ function prLeistungen_(ss, projekt, von, bis, hinweise) {
       anzeige[0].filter(String).join(' | ') + ' – bitte PR_LE_SPALTEN anpassen.');
   }
 
-  // Optionale Spalten (neu): „Pause (Min)" und „Was gemacht" – fehlen sie noch, läuft der Report wie bisher
+  // Optionale Spalten (neu): „Pause (Min)", „Was gemacht" und „Projekt-Unterkategorie" – fehlen sie noch, läuft der Report wie bisher
   const kopfNamen = anzeige[kopf].map(prKopfName_);
+  const iUnter = kopfNamen.findIndex(function (n) { return n === 'projektunterkategorie' || n === 'unterkategorie'; });
   const iPause = kopfNamen.findIndex(function (n) { return n === 'pausemin' || n === 'pause'; });
   const iWas = kopfNamen.indexOf('wasgemacht');
 
@@ -115,6 +116,7 @@ function prLeistungen_(ss, projekt, von, bis, hinweise) {
     const pauseErfasst = iPause >= 0 ? Math.max(0, Math.round(Number(String(werte[r][iPause]).replace(',', '.')) || 0)) : 0;
     out.push({
       projekt: zeilenProjekt,   // leer = Leistung ohne Projekt
+      unterkategorie: iUnter >= 0 ? prNorm_(anzeige[r][iUnter]) : '',   // leer = ohne Unterkategorie
       mitarbeiter: String(anzeige[r][idx.mitarbeiter]).trim(),
       kategorie: String(anzeige[r][idx.kategorie]).trim(),
       start: start,
@@ -133,13 +135,14 @@ function prLeistungen_(ss, projekt, von, bis, hinweise) {
 
 // ── BAUSTELLENBERICHTE ────────────────────────────────────────────────────────
 // Spalten: A Datum, B Projekt, C Erfasst von, D Zeitstempel, E–N Gruppen 1–5 (Std/Was),
-//          O Fahrten, P Belege, Q Foto-Links, R Bemerkungen
+//          O Fahrten, P Belege, Q Foto-Links, R Bemerkungen, S Projekt-Unterkategorie (optional)
 function prBerichte_(ss, projekt, von, bis, hinweise) {
   const sh = ss.getSheetByName(PR_SHEET_BERICHTE);
   if (!sh) throw new Error('Tab „' + PR_SHEET_BERICHTE + '" nicht gefunden.');
   const lastRow = sh.getLastRow();
   if (lastRow < 2) return [];
-  const range = sh.getRange(2, 1, lastRow - 1, 18);
+  const breite = Math.min(19, sh.getMaxColumns());   // Spalte S (Projekt-Unterkategorie) ist neu und optional
+  const range = sh.getRange(2, 1, lastRow - 1, breite);
   const anzeige = range.getDisplayValues();
   const formeln = range.getFormulas();
 
@@ -161,6 +164,7 @@ function prBerichte_(ss, projekt, von, bis, hinweise) {
     const fotos = (String(z[16]) + ' ' + String(formeln[r][16] || '')).match(/https?:\/\/[^\s,;"')]+/g) || [];
     out.push({
       projekt: prNorm_(z[1]),
+      unterkategorie: z.length > 18 ? prNorm_(z[18]) : '',
       datum: datum,
       erfasstVon: String(z[2]).trim(),
       zeitstempel: String(z[3]).trim(),
