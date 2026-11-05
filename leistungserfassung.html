@@ -401,6 +401,8 @@
       <input type="text" class="finput" id="mhUkNeu" maxlength="80" placeholder="Name der neuen Unterkategorie" autocomplete="off" style="display:none;margin-top:8px">
       <button type="button" class="uk-link" id="mhUkLink">+ Unterkategorie anlegen</button>
     </div>
+    <div class="pause-titel">Bei welcher Tätigkeit? (optional)</div>
+    <div class="chip-group" id="mhKatChips"></div>
     <div class="pause-titel">Wie viel Zeit?</div>
     <div class="chip-group" id="mhChips"></div>
     <input type="number" inputmode="numeric" min="1" max="600" step="1" class="finput" id="mhAndere" placeholder="Andere Dauer in Minuten" style="margin-top:8px">
@@ -907,10 +909,19 @@ function renderRundenHeute(runden){
 // Läuft über dieselbe Warteschlange wie die Leistungen (offline-fähig, doppelt senden ist unschädlich).
 let mhHeute = [];          // [{ id, projekt, unterkategorie, minuten, begruendung }]
 let mhWahl = 0;            // gewählte Minuten (0 = nichts, -1 = eigene Eingabe)
+let mhKat = '';            // gewählte Tätigkeit ('' = keine)
 const MH_WERTE = [15, 30, 45, 60, 90, 120];
 function mhRenderChips(){
   document.getElementById('mhChips').innerHTML = MH_WERTE.map(m =>
     `<button type="button" class="chip ${m === mhWahl ? 'active' : ''}" onclick="mhWaehle(${m})">${m} Min</button>`).join('');
+}
+function mhRenderKatChips(){
+  document.getElementById('mhKatChips').innerHTML = KATEGORIEN.map(k =>
+    `<button type="button" class="chip ${k === mhKat ? 'active' : ''}" onclick="mhWaehleKat('${k}')">${k}</button>`).join('');
+}
+function mhWaehleKat(k){
+  mhKat = (mhKat === k) ? '' : k;   // nochmal tippen = Auswahl aufheben
+  mhRenderKatChips();
 }
 function mhWaehle(m){
   mhWahl = m;
@@ -933,9 +944,12 @@ function oeffneMehraufwand(){
   sel.value = projekt;
   ukRender('mh', { wert: projekt ? uk : '' });
   mhWahl = 0;
+  mhKat = aktuelleRunde ? grundKategorie(aktuelleRunde.kategorie) : '';   // Tätigkeit der laufenden Leistung vorausgewählt (frei änderbar)
+  if(!KATEGORIEN.includes(mhKat)) mhKat = '';
   document.getElementById('mhAndere').value = '';
   document.getElementById('mhBegruendung').value = '';
   mhRenderChips();
+  mhRenderKatChips();
   document.getElementById('mhModal').style.display = 'flex';
 }
 function schliesseMehraufwand(){ document.getElementById('mhModal').style.display = 'none'; }
@@ -949,9 +963,10 @@ function speichereMehraufwand(){
   if(!sperre()) return;
   const unterkategorie = ukWert('mh');
   const id = neueId();
-  enqueue({ type:'mehraufwand', token: TOKEN, id, mitarbeiter: aktuellerMA, projekt, unterkategorie, minuten, begruendung, zeit: new Date().toISOString() });
+  const taetigkeit = mhKat;
+  enqueue({ type:'mehraufwand', token: TOKEN, id, mitarbeiter: aktuellerMA, projekt, unterkategorie, taetigkeit, minuten, begruendung, zeit: new Date().toISOString() });
   merkeNeueUnterkategorie(projekt, unterkategorie);
-  mhHeute = mhHeute.concat([{ id, projekt, unterkategorie, minuten, begruendung }]);
+  mhHeute = mhHeute.concat([{ id, projekt, unterkategorie, taetigkeit, minuten, begruendung }]);
   mhRender();
   schliesseMehraufwand();
   showToast('✅ Mehraufwand gemeldet');
@@ -964,6 +979,7 @@ function mhRender(){
     <div class="mh-row">
       <div>
         <div class="runde-info">${esc(projektAnzeige(m.projekt, m.unterkategorie))}</div>
+        ${m.taetigkeit ? `<div class="runde-projekt">${esc(m.taetigkeit)}</div>` : ''}
         <div class="runde-projekt">„${esc(m.begruendung)}"</div>
         <button type="button" class="mh-del" onclick="loescheMehraufwand('${esc(m.id)}')">🗑 Löschen</button>
       </div>
@@ -990,7 +1006,7 @@ async function ladeMehraufwandHeute(){
     const heute = heuteLokal();
     outbox.forEach(o => {
       if(o.type === 'mehraufwand' && o.mitarbeiter === name && String(o.zeit || '').length && heuteLokalVon(o.zeit) === heute && !liste.some(x => x.id === o.id))
-        liste.push({ id: o.id, projekt: o.projekt, unterkategorie: o.unterkategorie || '', minuten: o.minuten, begruendung: o.begruendung });
+        liste.push({ id: o.id, projekt: o.projekt, unterkategorie: o.unterkategorie || '', taetigkeit: o.taetigkeit || '', minuten: o.minuten, begruendung: o.begruendung });
       if(o.type === 'mehraufwand_loeschen' && o.mitarbeiter === name) liste = liste.filter(x => x.id !== o.id);
     });
     mhHeute = liste;

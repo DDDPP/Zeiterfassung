@@ -567,7 +567,7 @@ function renderMehraufwand(r){
   const summe = liste.reduce((s, m) => s + (Number(m.minuten) || 0), 0);
   // Als Zeilenliste statt Tabelle: Begründungen sind lang und sollen auch am Handy komplett lesbar sein
   return `<div class="rp-card"><h3>⚠️ Mehraufwand</h3>` +
-    liste.map(m => `<div class="mh-zeile"><div class="mh-kopf"><span>${fmtDatum(m.datum)} · ${esc(m.mitarbeiter)}${m.unterkategorie ? ' · ' + esc(m.unterkategorie) : ''}</span><b>${esc(m.minuten)} Min</b></div><div class="mh-text">${esc(m.begruendung)}</div></div>`).join('') +
+    liste.map(m => `<div class="mh-zeile"><div class="mh-kopf"><span>${fmtDatum(m.datum)} · ${esc(m.mitarbeiter)}${m.unterkategorie ? ' · ' + esc(m.unterkategorie) : ''}${m.taetigkeit ? ' · ' + esc(m.taetigkeit) : ''}</span><b>${esc(m.minuten)} Min</b></div><div class="mh-text">${esc(m.begruendung)}</div></div>`).join('') +
     `<div class="mh-summe"><span>Summe</span><span>${fmtStd(summe)} Std.</span></div>
     <div class="note info" style="margin:10px 0 0">ℹ️ Diese Zeit ist bereits in den Personenstunden enthalten – sie wird hier nur als zusätzlicher Aufwand ausgewiesen.</div></div>`;
 }
@@ -925,8 +925,8 @@ function exportAuszugCsv(){
 }
 function exportMehraufwandCsv(){
   if(!report || report.alle) return;
-  const zeilen = (report.mehr || []).map(m => [report.projekt, m.unterkategorie || '', fmtDatum(m.datum), m.mitarbeiter, m.minuten, fmtZahl(m.minuten / 60, 2), m.begruendung]);
-  ladeCsv(dateiBasis() + '_Mehraufwand.csv', [['Projekt','Unterkategorie','Datum','Mitarbeiter','Minuten','Stunden','Begründung'], ...zeilen]);
+  const zeilen = (report.mehr || []).map(m => [report.projekt, m.unterkategorie || '', fmtDatum(m.datum), m.mitarbeiter, m.taetigkeit || '', m.minuten, fmtZahl(m.minuten / 60, 2), m.begruendung]);
+  ladeCsv(dateiBasis() + '_Mehraufwand.csv', [['Projekt','Unterkategorie','Datum','Mitarbeiter','Tätigkeit','Minuten','Stunden','Begründung'], ...zeilen]);
 }
 function exportBerichteCsv(){
   if(!report) return;
