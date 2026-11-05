@@ -91,6 +91,11 @@
 
   /* ── Gesamtauszug (alle Projekte) ── */
   .tscroll{overflow-x:auto}
+  .mh-zeile{padding:8px 0;border-bottom:1px solid var(--border);break-inside:avoid}
+  .mh-kopf{display:flex;justify-content:space-between;gap:10px;font-size:13px}
+  .mh-kopf b{white-space:nowrap}
+  .mh-text{font-size:13px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
+  .mh-summe{display:flex;justify-content:space-between;font-size:13px;font-weight:700;padding-top:8px}
   .printonly{display:none}
   .projlink{background:none;border:none;padding:0;font:inherit;font-weight:600;color:var(--blue);text-align:left;cursor:pointer}
   .auszug-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:22px 0 10px}
@@ -185,6 +190,7 @@
       <button class="btn-secondary" id="btnAuszugCsv" style="display:none" onclick="exportAuszugCsv()">⬇️ CSV Auszug</button>
       <button class="btn-secondary" onclick="exportLeistungenCsv()">⬇️ CSV Leistungen</button>
       <button class="btn-secondary" onclick="exportBerichteCsv()">⬇️ CSV Baustellenberichte</button>
+      <button class="btn-secondary" id="btnMehrCsv" style="display:none" onclick="exportMehraufwandCsv()">⬇️ CSV Mehraufwand</button>
     </div>
     <div id="report"></div>
   </div>
@@ -337,9 +343,12 @@ async function erstelleReport(){
       erstellt: new Date()
     };
     report.skriptAlt = (report.leist.length + report.beric.length) > 0 && ![...report.leist, ...report.beric].some(x => 'unterkategorie' in x);   // Report-Skript kennt das Feld noch nicht
-    normalisiereUnterkategorien(report.leist, report.beric);
+    report.mehrAll = Array.isArray(data.mehraufwand) ? data.mehraufwand : [];   // Mehraufwand-Meldungen (nur Einzelprojekt)
+    normalisiereUnterkategorien(report.leist, report.beric, report.mehrAll);   // eine einheitliche Schreibweise über alle Listen
     report.abrechnungen = Array.isArray(data.abrechnungen) ? data.abrechnungen : [];
     report.abrFehlt = !alle && !Array.isArray(data.abrechnungen);   // Report-Skript kennt Abrechnungen noch nicht
+    report.mehrFehlt = !alle && !Array.isArray(data.mehraufwand);   // Report-Skript kennt Mehraufwand noch nicht
+    report.mehr = report.mehrAll;
     nurOffen = !alle && document.getElementById('nurOffen').checked;
     report.leistAll = report.leist; report.bericAll = report.beric;   // ungefiltert; der Unterkategorie-Filter wirkt auf leist/beric
     ukFilter = alle ? null : ukAusAuswahl();   // Auswahl unter dem Projekt gilt gleich beim Erstellen
@@ -404,6 +413,8 @@ function wendeUkFilterAn(r){
   r.leist = (r.leistAll || r.leist).filter(passt);
   r.beric = (r.bericAll || r.beric).filter(passt);
   r.ausgeblendet = null;
+  r.mehr = (r.mehrAll || []).filter(passt);
+  if(nurOffen && (r.abrechnungen || []).length) r.mehr = r.mehr.filter(m => !abgerechnetDurch(r, m.datum, m.unterkategorie));
   if(nurOffen && (r.abrechnungen || []).length){
     const aus = { leist: 0, min: 0, beric: 0, nrs: new Set() };
     r.leist = r.leist.filter(l => {
@@ -548,6 +559,17 @@ function ausblendNote(r){
   if(a.leist) teile.push(a.leist + ' Leistung' + (a.leist === 1 ? '' : 'en') + ' (' + fmtStd(a.min) + ' Std.)');
   if(a.beric) teile.push(a.beric + ' Baustellenbericht' + (a.beric === 1 ? '' : 'e'));
   return `<div class="note info">ℹ️ Nur noch nicht abgerechnete Leistungen. Ausgeblendet: ${teile.join(' und ')} – bereits abgerechnet mit ${[...a.nrs].map(esc).join(', ')}.</div>`;
+}
+// ── MEHRAUFWAND (nur zur Information: die Minuten stecken schon in den Personenstunden) ──
+function renderMehraufwand(r){
+  const liste = r.mehr || [];
+  if(!liste.length) return '';
+  const summe = liste.reduce((s, m) => s + (Number(m.minuten) || 0), 0);
+  // Als Zeilenliste statt Tabelle: Begründungen sind lang und sollen auch am Handy komplett lesbar sein
+  return `<div class="rp-card"><h3>⚠️ Mehraufwand</h3>` +
+    liste.map(m => `<div class="mh-zeile"><div class="mh-kopf"><span>${fmtDatum(m.datum)} · ${esc(m.mitarbeiter)}${m.unterkategorie ? ' · ' + esc(m.unterkategorie) : ''}</span><b>${esc(m.minuten)} Min</b></div><div class="mh-text">${esc(m.begruendung)}</div></div>`).join('') +
+    `<div class="mh-summe"><span>Summe</span><span>${fmtStd(summe)} Std.</span></div>
+    <div class="note info" style="margin:10px 0 0">ℹ️ Diese Zeit ist bereits in den Personenstunden enthalten – sie wird hier nur als zusätzlicher Aufwand ausgewiesen.</div></div>`;
 }
 function ukLabel(v){ return v === null ? '' : (v === '' ? OHNE_UK : v); }
 // Pausen als eigene Minus-Zeilen („Tätigkeit" = Pause): Summen mindern sich, die Tätigkeiten bleiben brutto
@@ -801,9 +823,11 @@ function renderAlle(){
 
 function renderReport(){
   document.getElementById('btnAuszugCsv').style.display = 'none';
+  document.getElementById('btnMehrCsv').style.display = 'none';
   if(report.alle) return renderAlle();
   const r = report;
   wendeUkFilterAn(r);
+  document.getElementById('btnMehrCsv').style.display = (r.mehr || []).length ? '' : 'none';
   const a = berechne(r);
   r.auswertung = a;
   const hatDaten = a.tage.length > 0;
@@ -813,6 +837,7 @@ function renderReport(){
       <div class="rp-meta">Zeitraum: <b>${esc(fmtZeitraum(r.von, r.bis))}</b><br>
         ${ukFilter !== null ? 'Unterkategorie: <b>' + esc(ukLabel(ukFilter)) + '</b><br>' : ''}${nurOffen && (r.abrechnungen || []).length ? 'Nur noch nicht abgerechnete Leistungen<br>' : ''}Erstellt am ${fmtDatum(isoLokal(r.erstellt))} um ${pad(r.erstellt.getHours())}:${pad(r.erstellt.getMinutes())} Uhr</div>
     </div>` + (zeigeUkFilter(r) ? renderUkFilter(r) : '') + renderAbrechnungen(r) +
+    (r.mehrFehlt ? '<div class="note warn noprint">⚠️ Mehraufwand ist noch nicht freigeschaltet – bitte <b>ProjektReport.gs</b> in Apps Script aktualisieren und neu bereitstellen.</div>' : '') +
     (r.skriptAlt && ukRegistrierte(r).length ? '<div class="note warn">⚠️ Der Report-Teil des Skripts liefert noch keine Unterkategorien – bitte <b>ProjektReport.gs</b> in Apps Script aktualisieren und neu bereitstellen. Bis dahin ist der Filter wirkungslos.</div>' : '');
 
   if(!hatDaten){
@@ -845,6 +870,7 @@ function renderReport(){
       `</tbody><tfoot><tr><td>Summe</td><td class="num">${fmtZahl(a.maschinenStd, 2)} Std.</td></tr></tfoot></table></div>`;
   }
 
+  html += renderMehraufwand(r);
   html += `<div class="section-title">Tagesdetails</div>` + a.tage.map(t => renderTag(t, a)).join('');
   document.getElementById('report').innerHTML = html;
 }
@@ -896,6 +922,11 @@ function exportAuszugCsv(){
   const zeilen = [...m.entries()].map(([k, min]) => [...k.split('\u0001'), fmtZahl(min / 60, 2)])
     .sort((a, b) => (a[0] === OHNE) - (b[0] === OHNE) || a[0].localeCompare(b[0], 'de') || a[1].localeCompare(b[1], 'de') || a[2].localeCompare(b[2], 'de') || a[3].localeCompare(b[3], 'de'));
   ladeCsv(dateiBasis() + '_Auszug.csv', [['Projekt','Unterkategorie','Mitarbeiter','Tätigkeit','Stunden (netto)'], ...zeilen]);
+}
+function exportMehraufwandCsv(){
+  if(!report || report.alle) return;
+  const zeilen = (report.mehr || []).map(m => [report.projekt, m.unterkategorie || '', fmtDatum(m.datum), m.mitarbeiter, m.minuten, fmtZahl(m.minuten / 60, 2), m.begruendung]);
+  ladeCsv(dateiBasis() + '_Mehraufwand.csv', [['Projekt','Unterkategorie','Datum','Mitarbeiter','Minuten','Stunden','Begründung'], ...zeilen]);
 }
 function exportBerichteCsv(){
   if(!report) return;

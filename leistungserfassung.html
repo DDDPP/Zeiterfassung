@@ -51,6 +51,11 @@
   .projekt-banner.kein .projekt-banner-name{display:none}
   .projekt-banner.kein.nichtnoetig{background:#6B7280}   /* Tätigkeit ohne Projektpflicht: neutral statt Warnfarbe */
   .uk-block{margin-top:12px}
+  .btn-mehr{margin-top:8px;color:#C2410C;border-color:#FDBA74}
+  .mh-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+  .mh-row:last-child{border-bottom:none}
+  .mh-min{font-size:13px;font-weight:700;white-space:nowrap}
+  .mh-del{margin-top:6px;background:none;border:0;padding:2px 0;font:inherit;font-size:12px;font-weight:600;color:var(--red);cursor:pointer}
   .uk-link{background:none;border:0;padding:4px 0;font:inherit;font-size:13px;font-weight:600;color:var(--green);cursor:pointer}
   .finput.hinweis{border-color:var(--orange);box-shadow:0 0 0 3px var(--orange-light)}
   /* Rückfrage „Kein Projekt ausgewählt" */
@@ -146,6 +151,7 @@
   <!-- START-BUTTON (initialer Zustand) -->
   <div class="submit-wrap" id="startWrap">
     <button class="btn-primary" id="startBtn" onclick="zeigeAuswahl('start')" disabled>▶️ Leistung starten</button>
+    <button type="button" class="btn-secondary btn-mehr" onclick="oeffneMehraufwand()">⚠️ Mehraufwand melden</button>
   </div>
 
   <!-- KATEGORIE/PROJEKT-AUSWAHL -->
@@ -180,6 +186,7 @@
       <button class="btn-secondary" onclick="naechsteRunde()">🔄 Nächste Leistung</button>
       <button class="btn-primary" onclick="rundeFertig()">✅ Fertig</button>
     </div>
+    <button type="button" class="btn-secondary btn-mehr" onclick="oeffneMehraufwand()">⚠️ Mehraufwand melden</button>
   </div>
 
   <!-- BISHERIGE RUNDEN HEUTE -->
@@ -187,6 +194,13 @@
     <div class="card-title">📋 Bisherige Leistungen heute</div>
     <div class="card-sub">Zum Bearbeiten oder Löschen antippen</div>
     <div id="heuteListe"></div>
+  </div>
+
+  <!-- MEHRAUFWAND HEUTE -->
+  <div class="form-card" id="mhCard" style="display:none">
+    <div class="card-title">⚠️ Mehraufwand heute</div>
+    <div class="card-sub">Nur zur Information – die Zeit steckt schon in deinen Leistungen</div>
+    <div id="mhListe"></div>
   </div>
 
   <!-- RUNDE BEARBEITEN -->
@@ -372,6 +386,32 @@
   </div>
 </div>
 
+<!-- Mehraufwand melden (Zeit, die zusätzlich zum Vereinbarten nötig war – ein „davon" der Leistungszeit) -->
+<div class="modal-overlay" id="mhModal">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="mhModalTitel">
+    <div class="modal-title" id="mhModalTitel">Mehraufwand melden</div>
+    <div class="modal-text">Wofür war mehr Zeit nötig als geplant? Die Zeit läuft in deiner Leistung weiter mit – hier hältst du nur fest, wie viel davon Mehraufwand war.</div>
+    <div class="fgroup">
+      <label class="flabel">Projekt</label>
+      <select class="finput" id="mhProjekt"><option value="">– auswählen –</option></select>
+    </div>
+    <div class="fgroup uk-block" id="mhUk" style="display:none">
+      <label class="flabel" id="mhUkLabel">Unterkategorie</label>
+      <select class="finput" id="mhUkSel"></select>
+      <input type="text" class="finput" id="mhUkNeu" maxlength="80" placeholder="Name der neuen Unterkategorie" autocomplete="off" style="display:none;margin-top:8px">
+      <button type="button" class="uk-link" id="mhUkLink">+ Unterkategorie anlegen</button>
+    </div>
+    <div class="pause-titel">Wie viel Zeit?</div>
+    <div class="chip-group" id="mhChips"></div>
+    <input type="number" inputmode="numeric" min="1" max="600" step="1" class="finput" id="mhAndere" placeholder="Andere Dauer in Minuten" style="margin-top:8px">
+    <div class="pause-titel">Begründung</div>
+    <textarea class="finput" id="mhBegruendung" rows="3" maxlength="500" placeholder="z. B. Steine im Boden, Maschine musste geholt werden …"></textarea>
+    <div class="card-sub" style="margin:4px 0 0">Tipp: Mit dem Mikrofon deiner Tastatur kannst du die Begründung auch diktieren.</div>
+    <button type="button" class="btn-primary" id="mhOk" style="margin-top:16px">Speichern</button>
+    <button type="button" class="btn-secondary" id="mhZurueck">Abbrechen</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -551,7 +591,7 @@ function verarbeiteOutbox(){
       retryT = setTimeout(verarbeiteOutbox, 15000);
     } else {
       updateSyncStatus(false);
-      if(aktuellerMA) ladeRundenHeute();   // Übersicht erst nach dem Senden abgleichen
+      if(aktuellerMA){ ladeRundenHeute(); ladeMehraufwandHeute(); }   // Übersicht erst nach dem Senden abgleichen
     }
   })();
   return sendPromise;
@@ -607,7 +647,8 @@ async function aktiviereMitarbeiter(name){
   document.getElementById('startBtn').disabled = !aktuellerMA;
   clearInterval(timerInterval);
   aktuelleRunde = null;
-  ['timerCard','auswahlCard','staleCard','heuteCard'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+  mhHeute = [];
+  ['timerCard','auswahlCard','staleCard','heuteCard','mhCard'].forEach(id => { document.getElementById(id).style.display = 'none'; });
   document.getElementById('startWrap').style.display = aktuellerMA ? '' : 'none';
   schliesseBearbeiten();
   if(!aktuellerMA) return;
@@ -619,7 +660,7 @@ async function aktiviereMitarbeiter(name){
     zeigeRunde();
   }
   await pruefeAktuelleRunde();
-  if(aktuellerMA === name) ladeRundenHeute();
+  if(aktuellerMA === name){ ladeRundenHeute(); ladeMehraufwandHeute(); }
 }
 
 document.getElementById('leMa').addEventListener('change', function(){ aktiviereMitarbeiter(this.value); });
@@ -654,7 +695,8 @@ try{ const c = JSON.parse(localStorage.getItem(UK_CACHE_KEY) || '{}'); if(c && t
 const UK_BLOECKE = {
   le:   { projekt:'leProjekt',   neu:'leProjektNeu' },
   edit: { projekt:'editProjekt', neu:'editProjektNeu' },
-  bb:   { projekt:'bbProjekt',   neu:'bbProjektNeu' }
+  bb:   { projekt:'bbProjekt',   neu:'bbProjektNeu' },
+  mh:   { projekt:'mhProjekt',   neu:'' }   // Mehraufwand-Fenster (ohne „Neues Projekt")
 };
 function ukBereinige(t){ return String(t == null ? '' : t).replace(/\s+/g, ' ').trim().substring(0, 80); }
 function ukListe(projekt){
@@ -761,6 +803,13 @@ function fuelleProjekte(liste){
     sel.innerHTML = optionsHtml;
     if(vorher && [...sel.options].some(o => o.value === vorher)) sel.value = vorher;   // Auswahl nicht überschreiben
   });
+  // Mehraufwand-Fenster: gleiche Liste, aber ohne „kein Projekt" und ohne „Neues Projekt"
+  const mhSel = document.getElementById('mhProjekt');
+  if(mhSel){
+    const vorherMh = mhSel.value;
+    mhSel.innerHTML = '<option value="">– auswählen –</option>' + projektOptionen;
+    if(vorherMh && [...mhSel.options].some(o => o.value === vorherMh)) mhSel.value = vorherMh;
+  }
   // Baustellenbericht: gleiche Projektliste, aber ohne „kein Projekt"; beim ersten Befüllen das zuletzt benutzte Projekt vorwählen
   const bb = document.getElementById('bbProjekt');
   if(bb){
@@ -852,6 +901,112 @@ function renderRundenHeute(runden){
     </div>
   `).join('');
 }
+
+// ── MEHRAUFWAND ─────────────────────────────────────────────────────────────────
+// Zeit, die zusätzlich zum Vereinbarten nötig war. Nur eine Meldung (ein „davon"): sie ändert keine Leistungszeit.
+// Läuft über dieselbe Warteschlange wie die Leistungen (offline-fähig, doppelt senden ist unschädlich).
+let mhHeute = [];          // [{ id, projekt, unterkategorie, minuten, begruendung }]
+let mhWahl = 0;            // gewählte Minuten (0 = nichts, -1 = eigene Eingabe)
+const MH_WERTE = [15, 30, 45, 60, 90, 120];
+function mhRenderChips(){
+  document.getElementById('mhChips').innerHTML = MH_WERTE.map(m =>
+    `<button type="button" class="chip ${m === mhWahl ? 'active' : ''}" onclick="mhWaehle(${m})">${m} Min</button>`).join('');
+}
+function mhWaehle(m){
+  mhWahl = m;
+  document.getElementById('mhAndere').value = '';
+  mhRenderChips();
+}
+function mhMinuten(){
+  const eigene = document.getElementById('mhAndere').value;
+  const n = Math.round(Number(eigene !== '' ? eigene : mhWahl));
+  return (isFinite(n) && n >= 1 && n <= 600) ? n : 0;
+}
+function oeffneMehraufwand(){
+  if(!aktuellerMA){ showToast('⚠️ Bitte zuerst deinen Namen auswählen'); return; }
+  const sel = document.getElementById('mhProjekt');
+  let projekt = '', uk = '';
+  if(aktuelleRunde && (aktuelleRunde.projekt || '').trim()){ projekt = aktuelleRunde.projekt.trim(); uk = aktuelleRunde.unterkategorie || ''; }
+  if(projekt && ![...sel.options].some(o => o.value === projekt)){
+    const op = document.createElement('option'); op.textContent = projekt; sel.appendChild(op);   // Projekt noch nicht in der Liste (z. B. gerade neu angelegt)
+  }
+  sel.value = projekt;
+  ukRender('mh', { wert: projekt ? uk : '' });
+  mhWahl = 0;
+  document.getElementById('mhAndere').value = '';
+  document.getElementById('mhBegruendung').value = '';
+  mhRenderChips();
+  document.getElementById('mhModal').style.display = 'flex';
+}
+function schliesseMehraufwand(){ document.getElementById('mhModal').style.display = 'none'; }
+function speichereMehraufwand(){
+  const projekt = document.getElementById('mhProjekt').value;
+  if(!projekt){ showToast('⚠️ Bitte ein Projekt auswählen'); return; }
+  const minuten = mhMinuten();
+  if(!minuten){ showToast('⚠️ Bitte die Zeit auswählen (1–600 Min)'); return; }
+  const begruendung = document.getElementById('mhBegruendung').value.trim();
+  if(!begruendung){ showToast('⚠️ Bitte eine kurze Begründung eintragen'); return; }
+  if(!sperre()) return;
+  const unterkategorie = ukWert('mh');
+  const id = neueId();
+  enqueue({ type:'mehraufwand', token: TOKEN, id, mitarbeiter: aktuellerMA, projekt, unterkategorie, minuten, begruendung, zeit: new Date().toISOString() });
+  merkeNeueUnterkategorie(projekt, unterkategorie);
+  mhHeute = mhHeute.concat([{ id, projekt, unterkategorie, minuten, begruendung }]);
+  mhRender();
+  schliesseMehraufwand();
+  showToast('✅ Mehraufwand gemeldet');
+}
+function mhRender(){
+  const card = document.getElementById('mhCard'), liste = document.getElementById('mhListe');
+  if(!aktuellerMA || !mhHeute.length){ liste.innerHTML = ''; card.style.display = 'none'; return; }
+  card.style.display = '';
+  liste.innerHTML = mhHeute.map(m => `
+    <div class="mh-row">
+      <div>
+        <div class="runde-info">${esc(projektAnzeige(m.projekt, m.unterkategorie))}</div>
+        <div class="runde-projekt">„${esc(m.begruendung)}"</div>
+        <button type="button" class="mh-del" onclick="loescheMehraufwand('${esc(m.id)}')">🗑 Löschen</button>
+      </div>
+      <div class="mh-min">${esc(m.minuten)} Min</div>
+    </div>`).join('');
+}
+function loescheMehraufwand(id){
+  if(!confirm('Diese Mehraufwand-Meldung wirklich löschen?')) return;
+  if(!sperre()) return;
+  enqueue({ type:'mehraufwand_loeschen', token: TOKEN, id, mitarbeiter: aktuellerMA });
+  mhHeute = mhHeute.filter(m => m.id !== id);
+  mhRender();
+  showToast('🗑 Meldung gelöscht');
+}
+async function ladeMehraufwandHeute(){
+  if(!aktuellerMA) return;
+  const name = aktuellerMA;
+  try{
+    const res = await fetch(WEBHOOK_BASE + '?action=mehraufwand_heute&mitarbeiter=' + encodeURIComponent(name) + '&token=' + encodeURIComponent(TOKEN));
+    const data = await res.json();
+    if(aktuellerMA !== name || data.status !== 'ok' || !Array.isArray(data.eintraege)) return;   // ältere Skript-Version: lokale Anzeige bleibt
+    let liste = data.eintraege.slice();
+    // Noch nicht übertragene Meldungen / Löschungen aus der Warteschlange berücksichtigen
+    const heute = heuteLokal();
+    outbox.forEach(o => {
+      if(o.type === 'mehraufwand' && o.mitarbeiter === name && String(o.zeit || '').length && heuteLokalVon(o.zeit) === heute && !liste.some(x => x.id === o.id))
+        liste.push({ id: o.id, projekt: o.projekt, unterkategorie: o.unterkategorie || '', minuten: o.minuten, begruendung: o.begruendung });
+      if(o.type === 'mehraufwand_loeschen' && o.mitarbeiter === name) liste = liste.filter(x => x.id !== o.id);
+    });
+    mhHeute = liste;
+    mhRender();
+  }catch(e){ console.warn('Mehraufwand konnte nicht geladen werden:', e); }
+}
+function heuteLokalVon(iso){
+  const d = new Date(iso), p = n => String(n).padStart(2,'0');
+  return isNaN(d.getTime()) ? '' : d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
+}
+document.getElementById('mhOk').addEventListener('click', speichereMehraufwand);
+document.getElementById('mhZurueck').addEventListener('click', schliesseMehraufwand);
+document.getElementById('mhAndere').addEventListener('input', function(){
+  if(this.value !== ''){ mhWahl = -1; mhRenderChips(); }   // eigene Eingabe ersetzt die Auswahl
+});
+document.addEventListener('keydown', e => { if(e.key === 'Escape' && document.getElementById('mhModal').style.display === 'flex') schliesseMehraufwand(); });
 
 // ── KATEGORIE-CHIPS ─────────────────────────────────────────────────────────────
 function renderKatChips(){

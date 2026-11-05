@@ -68,7 +68,8 @@ function projektReportAntwort_(e) {
     const berichte = prBerichte_(ss, projekt, von, bis, hinweise);
 
     const abrechnungen = alle ? [] : prAbrechnungen_(ss, projekt);
-    return prJson_({ status: 'ok', alle: alle, projekt: alle ? '' : p.projekt, von: von, bis: bis, leistungen: leistungen, berichte: berichte, abrechnungen: abrechnungen, hinweise: hinweise });
+    const mehraufwand = alle ? [] : prMehraufwand_(ss, projekt, von, bis);
+    return prJson_({ status: 'ok', alle: alle, projekt: alle ? '' : p.projekt, von: von, bis: bis, leistungen: leistungen, berichte: berichte, abrechnungen: abrechnungen, mehraufwand: mehraufwand, hinweise: hinweise });
   } catch (err) {
     return prJson_({ status: 'error', message: String((err && err.message) || err) });
   }
@@ -202,6 +203,30 @@ function prAbrechnungen_(ss, projekt) {
     if (projekt && p.toLowerCase() !== projekt.toLowerCase()) return;
     out.push({ id: String(z[0]).trim(), projekt: p, unterkategorie: prNorm_(z[2]), von: prIsoDatum_(z[3]), bis: prIsoDatum_(z[4]), nr: prNorm_(z[5]), erfasst: prNorm_(z[6]) });
   });
+  return out;
+}
+
+// ── MEHRAUFWAND (Tab „Mehraufwand": ID | Datum | Mitarbeiter | Projekt | Unterkategorie | Minuten | Begründung | Erfasst am) ──
+// Nur zur Information: die Minuten sind bereits in den Leistungsstunden enthalten (ein „davon").
+function prMehraufwand_(ss, projekt, von, bis) {
+  const sh = ss.getSheetByName('Mehraufwand');
+  if (!sh) return [];
+  const lastRow = sh.getLastRow();
+  if (lastRow < 2) return [];
+  const anzeige = sh.getRange(2, 1, lastRow - 1, 8).getDisplayValues();
+  const out = [];
+  anzeige.forEach(function (z) {
+    if (!z[0]) return;
+    if (prNorm_(z[3]).toLowerCase() !== projekt.toLowerCase()) return;
+    if (prAusgeschlossen_(z[2])) return;
+    const datum = prIsoDatum_(z[1]);
+    if (!datum) return;
+    if ((von && datum < von) || (bis && datum > bis)) return;
+    const min = parseFloat(String(z[5]).replace(',', '.')) || 0;
+    if (min <= 0) return;
+    out.push({ id: String(z[0]).trim(), datum: datum, mitarbeiter: String(z[2]).trim(), projekt: prNorm_(z[3]), unterkategorie: prNorm_(z[4]), minuten: min, begruendung: String(z[6]).trim() });
+  });
+  out.sort(function (a, b) { return a.datum < b.datum ? -1 : a.datum > b.datum ? 1 : 0; });
   return out;
 }
 
