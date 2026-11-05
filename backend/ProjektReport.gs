@@ -25,6 +25,9 @@
 
 const PR_SHEET_BERICHTE = 'Baustellenberichte';
 const PR_SHEET_LEISTUNG = 'Leistungserfassung';
+// NEU: erfasste Rechnungen je Projekt (und optional Unterkategorie) mit Leistungszeitraum – wird beim ersten Speichern automatisch angelegt
+const PR_SHEET_ABRECHNUNG = 'Abrechnungen';
+const PR_AB_KOPF = ['ID', 'Projekt', 'Unterkategorie', 'Leistungszeitraum von', 'Leistungszeitraum bis', 'Rechnungsnummer', 'Erfasst am'];
 
 // Uhrzeiten im Report immer in deutscher Zeit ausgeben – unabhängig von der Zeitzone der Tabelle
 const PR_ZEITZONE = 'Europe/Berlin';
@@ -48,6 +51,10 @@ function projektReportAntwort_(e) {
     if (!erwartet) return prJson_({ status: 'error', message: 'REPORT_TOKEN ist in den Skripteigenschaften nicht gesetzt.' });
     if (!p.token || p.token !== erwartet) return prJson_({ status: 'error', message: 'Zugang ungültig.' });
 
+    // NEU: Rechnungen erfassen/löschen (abrechnung=speichern|loeschen), Antwort: aktuelle Liste des Projekts
+    const aktion = String(p.abrechnung || '');
+    if (aktion === 'speichern' || aktion === 'loeschen') return prJson_(prAbrechnungAendern_(aktion, p));
+
     // alle=1 → Gesamtauszug über alle Projekte (inkl. Leistungen ohne Projekt), ohne Projektfilter
     const alle = String(p.alle || '') === '1';
     const projekt = alle ? '' : prNorm_(p.projekt);
@@ -60,7 +67,8 @@ function projektReportAntwort_(e) {
     const leistungen = prLeistungen_(ss, projekt, von, bis, hinweise);
     const berichte = prBerichte_(ss, projekt, von, bis, hinweise);
 
-    return prJson_({ status: 'ok', alle: alle, projekt: alle ? '' : p.projekt, von: von, bis: bis, leistungen: leistungen, berichte: berichte, hinweise: hinweise });
+    const abrechnungen = alle ? [] : prAbrechnungen_(ss, projekt);
+    return prJson_({ status: 'ok', alle: alle, projekt: alle ? '' : p.projekt, von: von, bis: bis, leistungen: leistungen, berichte: berichte, abrechnungen: abrechnungen, hinweise: hinweise });
   } catch (err) {
     return prJson_({ status: 'error', message: String((err && err.message) || err) });
   }
@@ -177,6 +185,72 @@ function prBerichte_(ss, projekt, von, bis, hinweise) {
   }
   out.sort(function (a, b) { return a.datum < b.datum ? -1 : a.datum > b.datum ? 1 : (a.zeitstempel < b.zeitstempel ? -1 : 1); });
   return out;
+}
+
+// ── ABRECHNUNGEN (Rechnungsnummer + Leistungszeitraum, nur zur Information) ─────────
+// Liest die Rechnungen eines Projekts (leer = alle). Datumsangaben kommen als 'yyyy-mm-dd' zurück.
+function prAbrechnungen_(ss, projekt) {
+  const sh = ss.getSheetByName(PR_SHEET_ABRECHNUNG);
+  if (!sh) return [];
+  const lastRow = sh.getLastRow();
+  if (lastRow < 2) return [];
+  const anzeige = sh.getRange(2, 1, lastRow - 1, PR_AB_KOPF.length).getDisplayValues();
+  const out = [];
+  anzeige.forEach(function (z) {
+    const p = prNorm_(z[1]);
+    if (!z[0] || !p) return;
+    if (projekt && p.toLowerCase() !== projekt.toLowerCase()) return;
+    out.push({ id: String(z[0]).trim(), projekt: p, unterkategorie: prNorm_(z[2]), von: prIsoDatum_(z[3]), bis: prIsoDatum_(z[4]), nr: prNorm_(z[5]), erfasst: prNorm_(z[6]) });
+  });
+  return out;
+}
+
+function prDatumDe_(iso) { return iso.slice(8, 10) + '.' + iso.slice(5, 7) + '.' + iso.slice(0, 4); }
+
+function prAbrechnungAendern_(aktion, p) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const projekt = prNorm_(p.projekt);
+  if (!projekt) return { status: 'error', message: 'Kein Projekt angegeben.' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    let sh = ss.getSheetByName(PR_SHEET_ABRECHNUNG);
+    if (aktion === 'speichern') {
+      const unter = prNorm_(p.unterkategorie).substring(0, 80);
+      const von = prIsoDatum_(p.von), bis = prIsoDatum_(p.bis);
+      const nr = prNorm_(p.nr).substring(0, 60);
+      if (!nr) return { status: 'error', message: 'Bitte eine Rechnungsnummer angeben.' };
+      if (!von || !bis) return { status: 'error', message: 'Bitte den Leistungszeitraum (von/bis) angeben.' };
+      if (von > bis) return { status: 'error', message: '„Von" liegt nach „Bis".' };
+      if (!sh) {
+        sh = ss.insertSheet(PR_SHEET_ABRECHNUNG);
+        sh.getRange(1, 1, 1, PR_AB_KOPF.length).setValues([PR_AB_KOPF]).setFontWeight('bold');
+        sh.setFrozenRows(1);
+      }
+      // Doppelte Anfrage (z. B. Doppeltipp): identischer Eintrag wird nicht noch einmal angelegt
+      const vorhanden = prAbrechnungen_(ss, projekt).some(function (a) {
+        return a.unterkategorie.toLowerCase() === unter.toLowerCase() && a.von === von && a.bis === bis && a.nr.toLowerCase() === nr.toLowerCase();
+      });
+      if (!vorhanden) {
+        const zeile = sh.getLastRow() + 1;
+        const erfasst = Utilities.formatDate(new Date(), PR_ZEITZONE, 'dd.MM.yyyy HH:mm');
+        sh.getRange(zeile, 1, 1, PR_AB_KOPF.length).setNumberFormat('@');   // alles als Text (keine Formeln, keine Datumsumwandlung)
+        sh.getRange(zeile, 1, 1, PR_AB_KOPF.length).setValues([[Utilities.getUuid().replace(/-/g, '').substring(0, 12), projekt, unter, prDatumDe_(von), prDatumDe_(bis), nr, erfasst]]);
+      }
+    } else {
+      const id = prNorm_(p.id);
+      if (!id) return { status: 'error', message: 'Keine ID angegeben.' };
+      if (sh && sh.getLastRow() >= 2) {
+        const ids = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getDisplayValues();
+        for (let i = 0; i < ids.length; i++) {
+          if (String(ids[i][0]).trim() === id) { sh.deleteRow(i + 2); break; }
+        }
+      }
+    }
+    return { status: 'ok', abrechnungen: prAbrechnungen_(ss, projekt) };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ── HILFSFUNKTIONEN (alle mit Präfix pr, damit nichts mit bestehendem Code kollidiert) ──

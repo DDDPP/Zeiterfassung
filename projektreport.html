@@ -36,6 +36,10 @@
   .finput:focus{outline:none;border-color:var(--blue)}
   select.finput{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;cursor:pointer}
   .ukfilter{margin-bottom:14px}
+  .ab-form{margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+  .ab-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+  .checkrow{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer}
+  .checkrow input{width:18px;height:18px}
   .ukfilter .flabel{margin-bottom:6px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .chip-group{display:flex;flex-wrap:wrap;gap:6px}
@@ -149,6 +153,9 @@
       <label class="flabel">Unterkategorie</label>
       <select class="finput" id="ukSel"></select>
     </div>
+    <div class="fgroup" id="offenGroup" style="display:none">
+      <label class="checkrow"><input type="checkbox" id="nurOffen"> Bereits abgerechnete Leistungen ausblenden</label>
+    </div>
     <div class="fgroup">
       <label class="flabel">Zeitraum</label>
       <div class="chip-group" id="zrChips"></div>
@@ -203,6 +210,8 @@ const MONATE = ['Januar','Februar','März','April','Mai','Juni','Juli','August',
 let report = null;   // { projekt, alle, von, bis, leist, beric, erstellt }
 let ansicht = 'ma';  // Gesamtauszug: 'ma' = nach Mitarbeiter, 'pr' = nach Projekt, 'pu' = Projekt › Unterkategorie
 const UK_ALLE = '__uk_alle__', UK_OHNE_WERT = '__uk_ohne__';   // Werte der Unterkategorie-Auswahl
+let nurOffen = false;   // Einzelprojekt: Leistungen aus bereits abgerechneten Zeiträumen ausblenden
+let abrOffen = false;   // Abrechnungen-Karte aufgeklappt
 let ukFilter = null; // Einzelprojekt: null = alle Unterkategorien, '' = nur ohne Unterkategorie, sonst Name
 
 // ── HILFSFUNKTIONEN ───────────────────────────────────────────────────────────
@@ -329,6 +338,9 @@ async function erstelleReport(){
     };
     report.skriptAlt = (report.leist.length + report.beric.length) > 0 && ![...report.leist, ...report.beric].some(x => 'unterkategorie' in x);   // Report-Skript kennt das Feld noch nicht
     normalisiereUnterkategorien(report.leist, report.beric);
+    report.abrechnungen = Array.isArray(data.abrechnungen) ? data.abrechnungen : [];
+    report.abrFehlt = !alle && !Array.isArray(data.abrechnungen);   // Report-Skript kennt Abrechnungen noch nicht
+    nurOffen = !alle && document.getElementById('nurOffen').checked;
     report.leistAll = report.leist; report.bericAll = report.beric;   // ungefiltert; der Unterkategorie-Filter wirkt auf leist/beric
     ukFilter = alle ? null : ukAusAuswahl();   // Auswahl unter dem Projekt gilt gleich beim Erstellen
     if(alle){
@@ -382,10 +394,33 @@ function ukNamen(r){
 }
 function zeigeUkFilter(r){ return hatUkDaten(r) || ukRegistrierte(r).length > 0; }
 // Filter anwenden (nur Einzelprojekt): wirkt auf Leistungen und Baustellenberichte
+// Rechnung, die diesen Tag abdeckt (gilt für das ganze Projekt, wenn keine Unterkategorie eingetragen ist, sonst nur für diese)
+function abgerechnetDurch(r, datum, uk){
+  return (r.abrechnungen || []).find(a => a.von && a.bis && datum >= a.von && datum <= a.bis &&
+    (!a.unterkategorie || a.unterkategorie.toLowerCase() === String(uk || '').toLowerCase())) || null;
+}
 function wendeUkFilterAn(r){
   const passt = x => ukFilter === null || (x.unterkategorie || '') === ukFilter;
   r.leist = (r.leistAll || r.leist).filter(passt);
   r.beric = (r.bericAll || r.beric).filter(passt);
+  r.ausgeblendet = null;
+  if(nurOffen && (r.abrechnungen || []).length){
+    const aus = { leist: 0, min: 0, beric: 0, nrs: new Set() };
+    r.leist = r.leist.filter(l => {
+      const a = abgerechnetDurch(r, String(l.start).slice(0, 10), l.unterkategorie);
+      if(!a) return true;
+      aus.leist++; aus.nrs.add(a.nr);
+      if(!l.offen) aus.min += l.dauerMin - (l.pauseMin || 0);
+      return false;
+    });
+    r.beric = r.beric.filter(b => {
+      const a = abgerechnetDurch(r, b.datum, b.unterkategorie);
+      if(!a) return true;
+      aus.beric++; aus.nrs.add(a.nr);
+      return false;
+    });
+    r.ausgeblendet = aus;
+  }
 }
 function waehleUk(i){
   const namen = ukNamen(report);
@@ -405,6 +440,7 @@ function renderUkFilter(r){
 function fuelleUkAuswahl(zuruecksetzen){
   const sel = document.getElementById('ukSel'), grp = document.getElementById('ukGroup');
   const pv = document.getElementById('projekt').value;
+  document.getElementById('offenGroup').style.display = (pv && pv !== ALLE) ? '' : 'none';   // „bereits abgerechnet ausblenden“ nur bei einem einzelnen Projekt
   const namen = (pv && pv !== ALLE) ? ukNamen({ alle:false, projekt:pv, leist:[], beric:[] }) : [];
   if(!namen.length){ grp.style.display = 'none'; sel.innerHTML = ''; return; }
   const vorher = zuruecksetzen ? '' : sel.value;
@@ -426,6 +462,93 @@ function syncUkAuswahl(){
   if([...sel.options].some(o => o.value === wert)) sel.value = wert;
 }
 document.getElementById('projekt').addEventListener('change', () => fuelleUkAuswahl(true));
+document.getElementById('nurOffen').addEventListener('change', function(){
+  nurOffen = this.checked;
+  if(report && !report.alle) renderReport();
+});
+// ── ABRECHNUNGEN (Rechnungsnummer + Leistungszeitraum, nur zur Information) ───────
+function renderAbrechnungen(r){
+  const liste = (r.abrechnungen || []).slice().sort((a, b) => String(a.von).localeCompare(String(b.von)) || String(a.nr).localeCompare(String(b.nr)));
+  if(r.abrFehlt){
+    return `<div class="note warn noprint">⚠️ Abrechnungen sind noch nicht freigeschaltet – bitte <b>ProjektReport.gs</b> in Apps Script aktualisieren und neu bereitstellen.</div>`;
+  }
+  const namen = ukNamen(r);
+  const tabelle = liste.length
+    ? `<div class="tscroll"><table class="t"><thead><tr><th>Rechnung</th><th>Leistungszeitraum</th><th>Gilt für</th><th class="noprint"></th></tr></thead><tbody>` +
+      liste.map(a => `<tr><td>${esc(a.nr)}</td><td style="white-space:nowrap">${a.von ? fmtDatum(a.von) : '?'} – ${a.bis ? fmtDatum(a.bis) : '?'}</td>
+        <td>${a.unterkategorie ? esc(a.unterkategorie) : '<i>gesamtes Projekt</i>'}</td>
+        <td class="noprint num"><button type="button" class="chip" onclick="loescheAbrechnung('${esc(a.id)}')">Löschen</button></td></tr>`).join('') +
+      `</tbody></table></div>`
+    : '<div class="empty">Noch keine Rechnung erfasst.</div>';
+  const vorUk = (ukFilter && namen.includes(ukFilter)) ? ukFilter : '';
+  const ukAuswahl = namen.length
+    ? `<div class="fgroup"><label class="flabel">Gilt für</label><select class="finput" id="abUk"><option value="">Gesamtes Projekt (alle Unterkategorien)</option>` +
+      namen.map(n => `<option${n === vorUk ? ' selected' : ''}>${esc(n)}</option>`).join('') + `</select></div>`
+    : '';
+  return `<details class="grp" id="abrDetails"${abrOffen ? ' open' : ''} ontoggle="abrOffen = this.open"><summary><span>💶 Abrechnungen</span><span class="num">${liste.length || ''}</span></summary>` +
+    tabelle +
+    `<div class="ab-form noprint">
+      <div class="fgroup"><label class="flabel">Rechnungsnummer</label><input type="text" class="finput" id="abNr" maxlength="60" autocomplete="off" placeholder="z. B. RE-2026-0142"></div>
+      <div class="ab-grid">
+        <div><label class="flabel">Leistungszeitraum von</label><input type="date" class="finput" id="abVon" value="${esc(r.von || '')}"></div>
+        <div><label class="flabel">bis</label><input type="date" class="finput" id="abBis" value="${esc(r.bis || '')}"></div>
+      </div>
+      ${ukAuswahl}
+      <button class="btn-primary" id="abBtn" onclick="speichereAbrechnung()">Rechnung speichern</button>
+    </div></details>`;
+}
+async function abrechnungSenden(params){
+  const url = WEBHOOK_BASE + '?action=projekt_report&token=' + encodeURIComponent(TOKEN) + '&projekt=' + encodeURIComponent(report.projekt) +
+    Object.keys(params).map(k => '&' + k + '=' + encodeURIComponent(params[k])).join('');
+  const res = await fetch(url);
+  const data = await res.json();
+  if(data.status !== 'ok') throw new Error(data.message || 'Unbekannter Fehler');
+  if(!Array.isArray(data.abrechnungen)) throw new Error('Das Report-Skript kennt Abrechnungen noch nicht – bitte ProjektReport.gs aktualisieren und neu bereitstellen.');
+  return data.abrechnungen;
+}
+async function speichereAbrechnung(){
+  if(!report || report.alle) return;
+  const nr = document.getElementById('abNr').value.trim();
+  const von = document.getElementById('abVon').value, bis = document.getElementById('abBis').value;
+  const ukEl = document.getElementById('abUk'), uk = ukEl ? ukEl.value : '';
+  if(!nr){ showToast('⚠️ Bitte Rechnungsnummer eintragen'); return; }
+  if(!von || !bis){ showToast('⚠️ Bitte den Leistungszeitraum (von/bis) eintragen'); return; }
+  if(von > bis){ showToast('⚠️ „Von" liegt nach „Bis"'); return; }
+  // Hinweis bei Überschneidung mit einer bereits erfassten Rechnung (gleicher Geltungsbereich)
+  const ueber = (report.abrechnungen || []).find(a => a.von && a.bis && von <= a.bis && bis >= a.von &&
+    (!a.unterkategorie || !uk || a.unterkategorie.toLowerCase() === uk.toLowerCase()));
+  if(ueber && !confirm('Der Zeitraum überschneidet sich mit Rechnung ' + ueber.nr + ' (' + fmtDatum(ueber.von) + ' – ' + fmtDatum(ueber.bis) + '). Trotzdem speichern?')) return;
+  const btn = document.getElementById('abBtn'); btn.disabled = true;
+  try{
+    report.abrechnungen = await abrechnungSenden({ abrechnung:'speichern', unterkategorie: uk, von, bis, nr });
+    abrOffen = true;
+    showToast('✅ Rechnung gespeichert');
+    renderReport();
+  }catch(e){ showToast('⚠️ ' + e.message); btn.disabled = false; }
+}
+async function loescheAbrechnung(id){
+  if(!report || report.alle) return;
+  const a = (report.abrechnungen || []).find(x => x.id === id);
+  if(!confirm('Rechnung ' + (a ? a.nr : '') + ' aus der Liste löschen?\n(Die Leistungen selbst bleiben unverändert.)')) return;
+  try{
+    report.abrechnungen = await abrechnungSenden({ abrechnung:'loeschen', id });
+    abrOffen = true;
+    showToast('🗑 Rechnung gelöscht');
+    renderReport();
+  }catch(e){ showToast('⚠️ ' + e.message); }
+}
+// Hinweis, was wegen „bereits abgerechnet ausblenden“ fehlt
+function ausblendNote(r){
+  if(!nurOffen) return '';
+  if(r.abrFehlt) return '';
+  if(!(r.abrechnungen || []).length) return '<div class="note info">ℹ️ „Bereits abgerechnete ausblenden“ ist aktiv, es sind aber noch keine Rechnungen erfasst – es wird nichts ausgeblendet.</div>';
+  const a = r.ausgeblendet;
+  if(!a || (!a.leist && !a.beric)) return '<div class="note info">ℹ️ Nur noch nicht abgerechnete Leistungen – im gewählten Zeitraum ist nichts bereits abgerechnet.</div>';
+  const teile = [];
+  if(a.leist) teile.push(a.leist + ' Leistung' + (a.leist === 1 ? '' : 'en') + ' (' + fmtStd(a.min) + ' Std.)');
+  if(a.beric) teile.push(a.beric + ' Baustellenbericht' + (a.beric === 1 ? '' : 'e'));
+  return `<div class="note info">ℹ️ Nur noch nicht abgerechnete Leistungen. Ausgeblendet: ${teile.join(' und ')} – bereits abgerechnet mit ${[...a.nrs].map(esc).join(', ')}.</div>`;
+}
 function ukLabel(v){ return v === null ? '' : (v === '' ? OHNE_UK : v); }
 // Pausen als eigene Minus-Zeilen („Tätigkeit" = Pause): Summen mindern sich, die Tätigkeiten bleiben brutto
 const PAUSE_KAT = 'Pause';
@@ -688,13 +811,13 @@ function renderReport(){
     <div class="rp-head">
       <h1>Projektreport: ${esc(r.projekt)}</h1>
       <div class="rp-meta">Zeitraum: <b>${esc(fmtZeitraum(r.von, r.bis))}</b><br>
-        ${ukFilter !== null ? 'Unterkategorie: <b>' + esc(ukLabel(ukFilter)) + '</b><br>' : ''}Erstellt am ${fmtDatum(isoLokal(r.erstellt))} um ${pad(r.erstellt.getHours())}:${pad(r.erstellt.getMinutes())} Uhr</div>
-    </div>` + (zeigeUkFilter(r) ? renderUkFilter(r) : '') +
+        ${ukFilter !== null ? 'Unterkategorie: <b>' + esc(ukLabel(ukFilter)) + '</b><br>' : ''}${nurOffen && (r.abrechnungen || []).length ? 'Nur noch nicht abgerechnete Leistungen<br>' : ''}Erstellt am ${fmtDatum(isoLokal(r.erstellt))} um ${pad(r.erstellt.getHours())}:${pad(r.erstellt.getMinutes())} Uhr</div>
+    </div>` + (zeigeUkFilter(r) ? renderUkFilter(r) : '') + renderAbrechnungen(r) +
     (r.skriptAlt && ukRegistrierte(r).length ? '<div class="note warn">⚠️ Der Report-Teil des Skripts liefert noch keine Unterkategorien – bitte <b>ProjektReport.gs</b> in Apps Script aktualisieren und neu bereitstellen. Bis dahin ist der Filter wirkungslos.</div>' : '');
 
   if(!hatDaten){
     return void (document.getElementById('report').innerHTML = html +
-      '<div class="rp-card"><div class="empty">Für dieses Projekt liegen im gewählten Zeitraum keine Leistungen oder Baustellenberichte vor.</div></div>');
+      ausblendNote(r) + '<div class="rp-card"><div class="empty">Für dieses Projekt liegen im gewählten Zeitraum keine Leistungen oder Baustellenberichte vor.</div></div>');
   }
 
   html += `<div class="tiles">
@@ -705,7 +828,7 @@ function renderReport(){
       <div class="tile"><div class="tile-val">${fmtZahl(a.maschinenStd, 2)}</div><div class="tile-lbl">Maschinenstunden</div></div>
     </div>`;
 
-  html += pauseNote(a);
+  html += ausblendNote(r) + pauseNote(a);
   if(a.offen) html += `<div class="note warn">⚠️ ${a.offen} Leistung(en) sind noch offen (kein Ende erfasst) und fehlen in den Stunden.</div>`;
   if(a.ohneBericht.length) html += `<div class="note info">ℹ️ Für ${a.ohneBericht.length === 1 ? 'diesen Tag liegt' : 'diese ' + a.ohneBericht.length + ' Tage liegen'} Leistungen, aber kein Baustellenbericht vor: ${a.ohneBericht.map(fmtDatum).join(', ')}</div>`;
   (r.hinweise || []).forEach(h => { html += `<div class="note warn">⚠️ ${esc(h)}</div>`; });
