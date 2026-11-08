@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Überblick</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Überblick">
+<meta name="theme-color" content="#4338CA">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-chef.png">
+<link rel="icon" type="image/png" sizes="180x180" href="icon-chef.png">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  :root {
+    --bg:#F7F8FA; --surface:#fff; --border:#E4E7EC; --text:#111827; --muted:#6B7280;
+    --green:#16A34A; --green-light:#DCFCE7; --red:#DC2626; --red-light:#FEE2E2;
+    --blue:#2563EB; --blue-light:#DBEAFE; --orange:#EA580C; --orange-light:#FEF0E7;
+    --indigo:#4338CA; --radius:14px;
+    --shadow:0 1px 4px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.06);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:0 0 48px}
+  .header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 20px 14px;position:sticky;top:0;z-index:10}
+  .header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .logo img{height:34px;width:auto;display:block}
+  .header-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .header-title{font-size:15px;font-weight:700}
+  .header-sub{font-size:11px;color:var(--muted);margin-top:2px}
+  .main{padding:16px 16px 0;max-width:720px;margin:0 auto}
+  .form-card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);border:1.5px solid var(--border);padding:18px;margin-bottom:14px}
+  .card-title{font-size:14px;font-weight:700;margin-bottom:3px;display:flex;align-items:center;gap:6px}
+  .card-sub{font-size:12px;color:var(--muted)}
+  .btn-secondary{padding:9px 13px;background:var(--surface);color:var(--text);border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+  .btn-secondary:disabled{opacity:.5}
+  .chip-group{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+  .chip{padding:8px 13px;border-radius:999px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer}
+  .chip.active{background:var(--indigo);color:#fff;border-color:var(--indigo)}
+  .checkrow{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;margin:2px 0 14px}
+  .checkrow input{width:18px;height:18px}
+  .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+  .tile{background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:12px 14px}
+  .tile.warn{border-color:#FCA5A5;background:var(--red-light)}
+  .tile-val{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+  .tile-lbl{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+  .section-title{font-size:15px;font-weight:700;margin:20px 0 10px}
+  .ev{background:var(--surface);border:1.5px solid var(--border);border-left-width:5px;border-radius:12px;padding:12px 14px;margin-bottom:9px;cursor:pointer;box-shadow:var(--shadow)}
+  .ev.warnung{border-left-color:var(--red)}
+  .ev.hinweis{border-left-color:var(--blue)}
+  .ev.gelesen{opacity:.55}
+  .ev-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  .ev-titel{font-size:14px;font-weight:700}
+  .ev-datum{font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap}
+  .ev-text{font-size:13px;line-height:1.45;margin-top:4px;overflow-wrap:anywhere}
+  .ev-meta{font-size:11px;color:var(--muted);margin-top:6px}
+  .note{font-size:12px;border-radius:10px;padding:9px 12px;margin-bottom:10px;line-height:1.45}
+  .note.warn{background:var(--orange-light);color:#9A3412}
+  .empty{text-align:center;color:var(--muted);font-size:13px;padding:22px 10px;background:var(--surface);border:1.5px dashed var(--border);border-radius:12px}
+  .spinner{text-align:center;color:var(--muted);font-size:13px;padding:30px 0}
+  pre.diag{font-size:11px;background:#111827;color:#E5E7EB;border-radius:10px;padding:12px;overflow:auto;margin-top:16px;white-space:pre-wrap}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#111;color:#fff;padding:11px 18px;border-radius:999px;font-size:13px;font-weight:500;z-index:200;transition:transform .3s ease;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}
+  .toast.show{transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div class="logo"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAATUAAABQCAYAAAB4UeJZAABO7UlEQVR42u19d3hd1ZX22ufce19XtVzoPYkNBLBwt5FIIIFAhklGCpkwZEhmTBIg4Aqk8PRS6aaEOplk0n4zkdImBYKBSOAq+cmU2CaYQIyNcZGs9uot5+zfH/ddWzYusjEQmLe/z5/5hPzKueesvffaa+8DlK1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyla2spWtbGUrW9nKVrayla1sZStb2cpWtrKVrWxlK1vZyvYWmVFehrKVrWzvFRPRaLSu9N9UXo6yla1s73pQY2ZRXoayla1s7xlQKy9B2cpWtveSHTKflkwmRUvLBOroWEsA0NAATZTS5SUtW9nK9o5aJBI5svSfI+bUmJN7jfBaW5tkeUXLVrayvZNGkUjkyEKhsLkEanyg3w9+Z+nS+ScalvlR05LjPWX39PcU/uejH/3eX5hbJbCWy1Fb2cpWtr9rUGMGEYGZk2J5Z+aLhmHMsyzj+GjMBAgoFlwUcs6cKZNuvyuI5srAVraylW1/lkwmRUODz+03NEzgXXRWShEdMMh6s6CWFI8+2mdWVhs3mpZxvZAiLATBdXUGYBOs1xuGMcY0xaMbNw/cetH5D7zAzEREXH50ZXszxpwUbW3rqLm5TZVX471hra1Nsqlp/H4zukPFD2OkH4AopZaumHNRKGItYEZICAHHsVcppZ7Xmn8+c+o9jz/99NxTakZHXzz26JpPLVkx7zIi+lVra5Msb8ayval0orTxmZOiowOisTHlHRo4+rzxoUYAZTs8kVlLSwsTkQKAR9uvPC4Rjp5HRGdBUMKUIq+UXrFpw8afEZETZIiHNVLzN0KrePTRJUbduGhHKCSnePyuhe+OhFtH0+bOsV0baajcN6bZj6x0E7rq7/vANXYU8q5XnlhfvFAkDxQl6bvP3YfYkPbNI0rdHV5L8BUQEAnkCzP7T2esPYG6Zel/btTJt0u7m4BASQmgd5QFKJlIxvIkdKkDWQTqOoujE2aYvdcAECBSQfFLFHEYFLUVgjgASXEAI1d7K7RKUQ2ASZc5oANHaJRrWjb0XtWApMAgBLJIBjFZ74FQnOGbhAl6x7EBLJmKGbQ1oOEbJzAF5cC7y0HgBMHmyKjg1PB0IkWm19ELJEHBdZE6IAFKLJgQH7Q7cggWwBAAoSaV0tLIQYiAGG3RjVhD2DsV4C1YR6+X7T02P98JTwUDNv9j6bRHCt+LR2mvKkj2sST7MJv+Vr9z7mRMTPqj71mJEFNxKEYBN9cJoMBOuFI6NjDfv3D3sOmQBXWDaT3JOPAklVUGpnJk1ib09C3VRlvPagdYC7WT3Cjnce+NM9MNAA==" alt="Garten Hoch 3"></div>
+  </div>
+  <div class="header-row">
+    <div>
+      <div class="header-title">🧭 Überblick</div>
+      <div class="header-sub" id="stand"></div>
+    </div>
+    <button class="btn-secondary" id="btnReload" onclick="lade()">↻ Aktualisieren</button>
+  </div>
+</div>
+
+<div class="main">
+  <br>
+  <div class="form-card" id="tokenError" style="display:none;border-color:var(--red)">
+    <div class="card-title" style="color:var(--red)">⚠️ Ungültiger Zugang</div>
+    <div class="card-sub">Bitte den vollständigen Link mit Zugangscode verwenden.</div>
+  </div>
+
+  <div id="bedien">
+    <div class="chip-group" id="zrChips"></div>
+    <div class="chip-group" id="typChips"></div>
+    <label class="checkrow"><input type="checkbox" id="nurNeu"> Nur ungelesene anzeigen</label>
+  </div>
+
+  <div id="status"></div>
+  <div id="inhalt"></div>
+  <pre class="diag" id="diag" style="display:none"></pre>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const WEBHOOK_BASE = 'https://script.google.com/macros/s/AKfycbw1AOqcgtunqJpDKU59VTJkn5TWr1xMip90EA5iOYf-FdcOASCcocZRMqO4IRPicCZf/exec';
+const PARAMS = new URLSearchParams(window.location.search);
+const TOKEN = PARAMS.get('token') || '';
+const DIAGNOSE = PARAMS.get('diagnose') === '1';
+const WOCHENTAGE = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+const ZEITRAEUME = [{t:1,l:'Heute'},{t:3,l:'3 Tage'},{t:7,l:'7 Tage'},{t:30,l:'30 Tage'}];
+const TYPEN = [{k:'alle',l:'Alle'},{k:'warnung',l:'⚠️ Warnungen'},{k:'hinweis',l:'ℹ️ Hinweise'}];
+const ICON = { pause_kurz:'☕', schicht_offen:'🚪', leistung_offen:'⏱️', lange_zeit:'🌙', mehraufwand:'🪨' };
+const KEY_GELESEN = 'gh3_chef_gelesen';
+const KEY_TAGE = 'gh3_chef_tage';
+const KEY_TYP = 'gh3_chef_typ';
+
+let tage = 7, typ = 'alle', daten = null, gelesen = {}, geladenUm = 0;
+try{ const g = JSON.parse(localStorage.getItem(KEY_GELESEN) || '{}'); if(g && typeof g === 'object' && !Array.isArray(g)) gelesen = g; }catch(e){}
+try{ const t = parseInt(localStorage.getItem(KEY_TAGE), 10); if(ZEITRAEUME.some(z => z.t === t)) tage = t; }catch(e){}
+try{ const k = localStorage.getItem(KEY_TYP); if(TYPEN.some(z => z.k === k)) typ = k; }catch(e){}
+
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtDatum(iso){
+  const d = new Date(iso + 'T12:00:00');
+  return WOCHENTAGE[d.getDay()] + ' ' + iso.slice(8,10) + '.' + iso.slice(5,7) + '.';
+}
+function toast(msg){
+  const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+function renderChips(){
+  document.getElementById('zrChips').innerHTML = ZEITRAEUME.map(z =>
+    `<button class="chip ${z.t === tage ? 'active' : ''}" onclick="setTage(${z.t})">${z.l}</button>`).join('');
+  document.getElementById('typChips').innerHTML = TYPEN.map(z =>
+    `<button class="chip ${z.k === typ ? 'active' : ''}" onclick="setTyp('${z.k}')">${z.l}</button>`).join('');
+}
+function setTage(t){ tage = t; try{ localStorage.setItem(KEY_TAGE, String(t)); }catch(e){} renderChips(); lade(); }
+function setTyp(k){ typ = k; try{ localStorage.setItem(KEY_TYP, k); }catch(e){} renderChips(); render(); }
+document.getElementById('nurNeu').addEventListener('change', render);
+
+async function lade(){
+  const btn = document.getElementById('btnReload');
+  btn.disabled = true;
+  document.getElementById('status').innerHTML = '<div class="spinner">Lade …</div>';
+  try{
+    const url = WEBHOOK_BASE + '?action=chef_feed&token=' + encodeURIComponent(TOKEN) + '&tage=' + tage + (DIAGNOSE ? '&diagnose=1' : '');
+    const res = await fetch(url);
+    const j = await res.json();
+    if(j.status !== 'ok') throw new Error(j.message || 'Unbekannter Fehler');
+    daten = j; geladenUm = Date.now();
+    document.getElementById('status').innerHTML = '';
+    const jetzt = new Date();
+    document.getElementById('stand').textContent = 'Stand ' + String(jetzt.getHours()).padStart(2,'0') + ':' + String(jetzt.getMinutes()).padStart(2,'0') + ' Uhr';
+    render();
+    if(DIAGNOSE && j.diagnose){
+      const pre = document.getElementById('diag'); pre.style.display = ''; pre.textContent = JSON.stringify(j.diagnose, null, 2);
+    }
+  }catch(err){
+    document.getElementById('status').innerHTML = '<div class="note warn">⚠️ ' + esc(err.message || err) + '</div>';
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+function ereignisKarte(e){
+  const klasse = 'ev ' + e.schwere + (gelesen[e.id] ? ' gelesen' : '');
+  const meta = [e.mitarbeiter, e.projekt].filter(Boolean).join(' · ');
+  return `<div class="${klasse}" data-id="${esc(e.id)}" onclick="toggleGelesen(this.dataset.id)">
+    <div class="ev-top"><div class="ev-titel">${ICON[e.typ] || '•'} ${esc(e.titel)}</div><div class="ev-datum">${fmtDatum(e.datum)}${e.zeit ? ' · ' + esc(e.zeit) : ''}</div></div>
+    <div class="ev-text">${esc(e.text)}</div>
+    ${meta ? '<div class="ev-meta">' + esc(meta) + '</div>' : ''}
+  </div>`;
+}
+
+function toggleGelesen(id){
+  if(gelesen[id]) delete gelesen[id]; else gelesen[id] = Date.now();
+  // Liste begrenzen: nur die 500 neuesten Markierungen behalten
+  const ids = Object.keys(gelesen);
+  if(ids.length > 500){ ids.sort((a,b) => gelesen[a] - gelesen[b]).slice(0, ids.length - 500).forEach(k => delete gelesen[k]); }
+  try{ localStorage.setItem(KEY_GELESEN, JSON.stringify(gelesen)); }catch(e){}
+  render();
+}
+
+function render(){
+  const wrap = document.getElementById('inhalt');
+  if(!daten){ wrap.innerHTML = ''; return; }
+  const alle = daten.ereignisse || [];
+  const warn = alle.filter(e => e.schwere === 'warnung');
+  const info = alle.filter(e => e.schwere === 'hinweis');
+  const ungelesen = alle.filter(e => !gelesen[e.id]).length;
+  const nurNeu = document.getElementById('nurNeu').checked;
+  const sicht = e => !nurNeu || !gelesen[e.id];
+
+  let html = '';
+  (daten.hinweise || []).forEach(h => { html += '<div class="note warn">⚠️ ' + esc(h) + '</div>'; });
+  html += `<div class="tiles">
+    <div class="tile ${warn.length ? 'warn' : ''}"><div class="tile-val">${warn.length}</div><div class="tile-lbl">Warnungen</div></div>
+    <div class="tile"><div class="tile-val">${info.length}</div><div class="tile-lbl">Hinweise</div></div>
+    <div class="tile"><div class="tile-val">${ungelesen}</div><div class="tile-lbl">Ungelesen</div></div>
+  </div>`;
+
+  const bloecke = [];
+  if(typ !== 'hinweis') bloecke.push({ titel:'⚠️ Warnungen', liste:warn.filter(sicht), leer:'✅ Keine Warnungen im gewählten Zeitraum.' });
+  if(typ !== 'warnung') bloecke.push({ titel:'ℹ️ Hinweise', liste:info.filter(sicht), leer:'Keine Hinweise im gewählten Zeitraum.' });
+  bloecke.forEach(b => {
+    html += `<div class="section-title">${b.titel} (${b.liste.length})</div>`;
+    html += b.liste.length ? b.liste.map(ereignisKarte).join('') : `<div class="empty">${b.leer}</div>`;
+  });
+  html += '<div class="card-sub" style="margin-top:14px;text-align:center">Tippe auf einen Eintrag, um ihn als gelesen zu markieren.</div>';
+  wrap.innerHTML = html;
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+renderChips();
+if(!TOKEN){
+  document.getElementById('tokenError').style.display = '';
+  document.getElementById('bedien').style.display = 'none';
+  document.getElementById('btnReload').style.display = 'none';
+} else {
+  lade();
+  // Beim Zurückkehren in die App neu laden, wenn der letzte Abruf älter als 2 Minuten ist
+  document.addEventListener('visibilitychange', () => {
+    if(!document.hidden && geladenUm && Date.now() - geladenUm > 120000) lade();
+  });
+}
+
+// ── SERVICE WORKER (Auto-Update) ──────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').then(reg => {
+    reg.addEventListener('updatefound', () => {
+      const newWorker = reg.installing;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+          const t = document.getElementById('toast');
+          t.textContent = '🔄 Update verfügbar – tippe zum Aktualisieren';
+          t.classList.add('show');
+          t.style.cursor = 'pointer';
+          t.onclick = () => {
+            newWorker.postMessage({ action: 'skipWaiting' });
+            t.classList.remove('show');
+            t.style.cursor = '';
+            t.onclick = null;
+          };
+        }
+      });
+    });
+  });
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
+  });
+}
+</script>
+</body>
+</html>

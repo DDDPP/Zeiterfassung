@@ -1,15 +1,17 @@
 // ── GARTEN HOCH 3 – Service Worker ────────────────────────────────────────────
 // Version hier hochzählen bei jedem Update → löst automatisches Update aus
-const CACHE_VERSION = 'gh3-v68';
+const CACHE_VERSION = 'gh3-v69';
 const CACHE_FILES = [
   './zeiterfassung.html',
   './baustellenbericht.html',
   './leistungserfassung.html',
   './projektreport.html',
+  './chef.html',
   './apple-touch-icon.png',
   './icon-projekte.png',
   './icon-mitarbeiterzeiten.png',
   './icon-report.png',
+  './icon-chef.png',
   './manifest.json'
 ];
 // Installation: Dateien cachen
