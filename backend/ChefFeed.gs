@@ -39,6 +39,11 @@ const CF_ERSTE_DATENZEILE = 56;   // erste Tageszeile (01.01.2026)
 const CF_MAX_TAGE = 60;
 const CF_LANGER_TAG_MIN = 600;    // Annahme A5
 
+// Diese Mitarbeiter erscheinen nie im Chef-Überblick (nur hier – der Report hat seine eigene Liste PR_AUSGESCHLOSSEN).
+// Es zählt die genaue Schreibweise des Tab-Namens bzw. des Namens in der Leistungserfassung (Groß-/Kleinschreibung egal).
+// Annahme A7: Der Tab heißt „Domenico Rigliaco" oder „Domenico" – beide Schreibweisen sind eingetragen.
+const CF_AUSGESCHLOSSEN = ['Domenico Rigliaco', 'Domenico'];
+
 function chefFeedAntwort_(e) {
   const p = (e && e.parameter) || {};
   try {
@@ -56,13 +61,13 @@ function chefFeedAntwort_(e) {
 
     const ereignisse = [];
     const hinweise = [];
-    const diag = { mitarbeiterTabs: [], uebersprungeneTabs: [], beispiele: [] };
+    const diag = { mitarbeiterTabs: [], uebersprungeneTabs: [], ausgeschlosseneTabs: [], beispiele: [] };
 
     const stempel = {};     // Zeiterfassung je Mitarbeiter und Tag (für den Abgleich)
     let leistungen = [];    // Leistungsrunden im Zeitraum (für offene Leistungen und Abgleich)
     cfAbschnitt_('Stempeluhr', hinweise, function () { cfStempeluhr_(ss, von, heute, ereignisse, hinweise, diag, stempel); });
     cfAbschnitt_('Leistungserfassung', hinweise, function () {
-      leistungen = prLeistungen_(ss, '', von, heute, []);
+      leistungen = prLeistungen_(ss, '', von, heute, []).filter(function (l) { return !cfAusgeschlossen_(l.mitarbeiter); });
       cfOffeneLeistungen_(leistungen, heute, ereignisse);
     });
     cfAbschnitt_('Abgleich Zeiterfassung/Leistungserfassung', hinweise, function () { cfAbgleich_(stempel, leistungen, heute, ereignisse, hinweise, diag); });
@@ -93,6 +98,7 @@ function cfStempeluhr_(ss, von, heute, out, hinweise, diag, stempel) {
   ss.getSheets().forEach(function (sh) {
     const name = sh.getName();
     if (prAusgeschlossen_(name)) return;
+    if (cfAusgeschlossen_(name)) { diag.ausgeschlosseneTabs.push(name); return; }
     const letzteZeile = sh.getLastRow(), letzteSpalte = sh.getLastColumn();
     let kopf = [];
     if (letzteZeile >= CF_KOPFZEILE && letzteSpalte >= 6) {
@@ -238,7 +244,7 @@ function cfMehraufwand_(ss, von, heute, out) {
   if (!sh || sh.getLastRow() < 2) return;
   const z = sh.getRange(2, 1, sh.getLastRow() - 1, Math.min(9, sh.getMaxColumns())).getDisplayValues();
   z.forEach(function (r) {
-    if (!r[0] || prAusgeschlossen_(r[2])) return;
+    if (!r[0] || prAusgeschlossen_(r[2]) || cfAusgeschlossen_(r[2])) return;
     const datum = prIsoDatum_(r[1]);
     if (!datum || datum < von || datum > heute) return;
     const min = parseFloat(String(r[5]).replace(',', '.')) || 0;
@@ -260,6 +266,10 @@ const CF_QUELLE = { pause_kurz: 'Zeiterfassung', schicht_offen: 'Zeiterfassung',
 function cfEreignis_(typ, schwere, datum, zeit, mitarbeiter, projekt, titel, text, schluessel) {
   return { id: [typ, mitarbeiter, datum, schluessel].join('|'), typ: typ, schwere: schwere, quelle: CF_QUELLE[typ] || '', datum: datum, zeit: zeit || '',
            mitarbeiter: mitarbeiter, projekt: projekt || '', titel: titel, text: text };
+}
+function cfAusgeschlossen_(name) {
+  const n = prNorm_(name).toLowerCase();
+  return CF_AUSGESCHLOSSEN.some(function (x) { return x.toLowerCase() === n; });
 }
 function cfTagePlus_(iso, n) {
   const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
