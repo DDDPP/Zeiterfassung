@@ -112,7 +112,7 @@ function cfStempeluhr_(ss, von, heute, out, hinweise, diag) {
       if (!datum || datum < von || datum > heute) return;
       if (prKopfName_(z[2]) !== 'arbeitstag') return;
 
-      let nettoTag = 0, hatSchicht = false;
+      let nettoTag = 0, anwesendTag = 0, pauseTag = 0, hatSchicht = false;
       schichten.forEach(function (ix, n) {
         if (ix[2] >= z.length) return;
         const b = cfMin_(z[ix[0]]);
@@ -143,12 +143,15 @@ function cfStempeluhr_(ss, von, heute, out, hinweise, diag) {
               (pauseRoh == null ? 'keine Pause' : pause + ' Min. Pause') + ' eingetragen – vorgeschrieben sind ' + pflicht + ' Min.', String(schichtNr)));
         }
         nettoTag += brutto - pause;
+        anwesendTag += brutto;
+        pauseTag += pause;
       });
 
       if (hatSchicht && nettoTag > CF_LANGER_TAG_MIN) {
         out.push(cfEreignis_('lange_zeit', 'warnung', datum, '', name, '',
           'Sehr langer Arbeitstag',
-          name + ' kommt am ' + cfDatumKurz_(datum) + ' auf ' + cfStdMin_(nettoTag) + ' Std. Arbeitszeit (ohne Pause).', ''));
+          name + ' war am ' + cfDatumKurz_(datum) + ' ' + cfStdMin_(anwesendTag) + ' Std. anwesend, davon ' + pauseTag + ' Min. Pause – ' +
+            'Arbeitszeit nach Abzug der Pause: ' + cfStdMin_(nettoTag) + ' Std.', ''));
       }
     });
   });
@@ -192,8 +195,11 @@ function cfMehraufwand_(ss, von, heute, out) {
 }
 
 // ── HILFSFUNKTIONEN (Präfix cf) ─────────────────────────────────────────────────
+// Woher ein Ereignis stammt (wird in der Chef-Seite als Herkunft angezeigt)
+const CF_QUELLE = { pause_kurz: 'Zeiterfassung', schicht_offen: 'Zeiterfassung', lange_zeit: 'Zeiterfassung',
+                    leistung_offen: 'Leistungserfassung', mehraufwand: 'Mehraufwand' };
 function cfEreignis_(typ, schwere, datum, zeit, mitarbeiter, projekt, titel, text, schluessel) {
-  return { id: [typ, mitarbeiter, datum, schluessel].join('|'), typ: typ, schwere: schwere, datum: datum, zeit: zeit || '',
+  return { id: [typ, mitarbeiter, datum, schluessel].join('|'), typ: typ, schwere: schwere, quelle: CF_QUELLE[typ] || '', datum: datum, zeit: zeit || '',
            mitarbeiter: mitarbeiter, projekt: projekt || '', titel: titel, text: text };
 }
 function cfTagePlus_(iso, n) {

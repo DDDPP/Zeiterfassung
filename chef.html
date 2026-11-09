@@ -52,7 +52,8 @@
   .ev-titel{font-size:14px;font-weight:700}
   .ev-datum{font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap}
   .ev-text{font-size:13px;line-height:1.45;margin-top:4px;overflow-wrap:anywhere}
-  .ev-meta{font-size:11px;color:var(--muted);margin-top:6px}
+  .ev-meta{font-size:11px;color:var(--muted);margin-top:6px;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+  .src{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;border-radius:999px;background:#EEF2FF;color:var(--indigo)}
   .note{font-size:12px;border-radius:10px;padding:9px 12px;margin-bottom:10px;line-height:1.45}
   .note.warn{background:var(--orange-light);color:#9A3412}
   .empty{text-align:center;color:var(--muted);font-size:13px;padding:22px 10px;background:var(--surface);border:1.5px dashed var(--border);border-radius:12px}
@@ -162,10 +163,11 @@ async function lade(){
 function ereignisKarte(e){
   const klasse = 'ev ' + e.schwere + (gelesen[e.id] ? ' gelesen' : '');
   const meta = [e.mitarbeiter, e.projekt].filter(Boolean).join(' · ');
+  const quelle = e.quelle ? `<span class="src">${esc(e.quelle)}</span>` : '';
   return `<div class="${klasse}" data-id="${esc(e.id)}" onclick="toggleGelesen(this.dataset.id)">
     <div class="ev-top"><div class="ev-titel">${ICON[e.typ] || '•'} ${esc(e.titel)}</div><div class="ev-datum">${fmtDatum(e.datum)}${e.zeit ? ' · ' + esc(e.zeit) : ''}</div></div>
     <div class="ev-text">${esc(e.text)}</div>
-    ${meta ? '<div class="ev-meta">' + esc(meta) + '</div>' : ''}
+    ${(quelle || meta) ? '<div class="ev-meta">' + quelle + (meta ? '<span>' + esc(meta) + '</span>' : '') + '</div>' : ''}
   </div>`;
 }
 
@@ -198,7 +200,7 @@ function render(){
 
   const bloecke = [];
   if(typ !== 'hinweis') bloecke.push({ titel:'⚠️ Warnungen', liste:warn.filter(sicht), leer:'✅ Keine Warnungen im gewählten Zeitraum.' });
-  if(typ !== 'warnung') bloecke.push({ titel:'ℹ️ Hinweise', liste:info.filter(sicht), leer:'Keine Hinweise im gewählten Zeitraum.' });
+  if(typ !== 'warnung') bloecke.push({ titel:'ℹ️ Hinweise', liste:info.filter(sicht), leer:'Keine gemeldeten Mehraufwände im gewählten Zeitraum.' });
   bloecke.forEach(b => {
     html += `<div class="section-title">${b.titel} (${b.liste.length})</div>`;
     html += b.liste.length ? b.liste.map(ereignisKarte).join('') : `<div class="empty">${b.leer}</div>`;
