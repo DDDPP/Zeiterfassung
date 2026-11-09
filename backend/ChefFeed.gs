@@ -2,7 +2,8 @@
 // GARTEN HOCH 3 – Chef-Überblick (Backend-Modul für den Apps-Script-Webhook)
 // ═══════════════════════════════════════════════════════════════════════════════
 // Liefert für die Seite chef.html einen Feed aus Ereignissen der letzten Tage:
-//   Warnungen:  Pause zu kurz · Schicht ohne Ausstempeln · Leistung ohne Ende · sehr langer Arbeitstag
+//   Warnungen:  Pause zu kurz · Schicht ohne Ausstempeln · Leistung ohne Ende · sehr langer Arbeitstag ·
+//               Leistung ohne Arbeitszeit · Arbeitszeit ohne Leistung
 //   Hinweise:   gemeldeter Mehraufwand
 // Alles wird beim Abruf direkt aus den Tabs berechnet (kein eigener Ereignis-Tab, keine
 // Änderung an bestehenden Skripten). Nutzt Hilfsfunktionen aus ProjektReport.gs (gleiches
@@ -27,6 +28,8 @@
 //  A3. Uhrzeiten stehen als „HH:MM" in der Anzeige der Zellen; die Pause als Minuten-Zahl oder „H:MM".
 //  A4. Die Pausenregel entspricht der Stempeluhr-App: je Schicht über 6 Std. mindestens 30 Min.,
 //      über 9 Std. mindestens 45 Min. (Anwesenheitszeit Ende − Beginn).
+//  A6. Der Name in der Leistungserfassung (Spalte „Mitarbeiter") ist genauso geschrieben wie der Tab-Name
+//      (Groß-/Kleinschreibung egal). Andere Namen werden nicht verglichen und als Hinweis gemeldet.
 //  A5. Schwelle „sehr langer Arbeitstag": mehr als 10 Std. netto am Tag (CF_LANGER_TAG_MIN) – Richtwert, keine Messung.
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -55,8 +58,14 @@ function chefFeedAntwort_(e) {
     const hinweise = [];
     const diag = { mitarbeiterTabs: [], uebersprungeneTabs: [], beispiele: [] };
 
-    cfAbschnitt_('Stempeluhr', hinweise, function () { cfStempeluhr_(ss, von, heute, ereignisse, hinweise, diag); });
-    cfAbschnitt_('Leistungserfassung', hinweise, function () { cfOffeneLeistungen_(ss, von, heute, ereignisse); });
+    const stempel = {};     // Zeiterfassung je Mitarbeiter und Tag (für den Abgleich)
+    let leistungen = [];    // Leistungsrunden im Zeitraum (für offene Leistungen und Abgleich)
+    cfAbschnitt_('Stempeluhr', hinweise, function () { cfStempeluhr_(ss, von, heute, ereignisse, hinweise, diag, stempel); });
+    cfAbschnitt_('Leistungserfassung', hinweise, function () {
+      leistungen = prLeistungen_(ss, '', von, heute, []);
+      cfOffeneLeistungen_(leistungen, heute, ereignisse);
+    });
+    cfAbschnitt_('Abgleich Zeiterfassung/Leistungserfassung', hinweise, function () { cfAbgleich_(stempel, leistungen, heute, ereignisse, hinweise, diag); });
     cfAbschnitt_('Mehraufwand', hinweise, function () { cfMehraufwand_(ss, von, heute, ereignisse); });
 
     ereignisse.sort(function (a, b) {
@@ -79,7 +88,7 @@ function cfAbschnitt_(name, hinweise, fn) {
 }
 
 // ── STEMPELUHR (Mitarbeiter-Tabs) ───────────────────────────────────────────────
-function cfStempeluhr_(ss, von, heute, out, hinweise, diag) {
+function cfStempeluhr_(ss, von, heute, out, hinweise, diag, stempel) {
   const schichten = [[3, 4, 5], [9, 10, 11], [13, 14, 15]];   // Spalten D/E/F, J/K/L, N/O/P (0-basiert)
   ss.getSheets().forEach(function (sh) {
     const name = sh.getName();
@@ -110,7 +119,11 @@ function cfStempeluhr_(ss, von, heute, out, hinweise, diag) {
     zeilen.forEach(function (z) {
       const datum = prIsoDatum_(z[0]);
       if (!datum || datum < von || datum > heute) return;
-      if (prKopfName_(z[2]) !== 'arbeitstag') return;
+      // Für den Abgleich mit der Leistungserfassung: je Mitarbeiter und Tag merken, was gestempelt wurde
+      const typ = prKopfName_(z[2]);
+      const rec = { name: name, datum: datum, typ: typ, typText: prNorm_(z[2]), brutto: 0, schichten: 0 };
+      stempel[prNorm_(name).toLowerCase() + '|' + datum] = rec;
+      if (typ !== 'arbeitstag') return;
 
       let nettoTag = 0, anwesendTag = 0, pauseTag = 0, hatSchicht = false;
       schichten.forEach(function (ix, n) {
@@ -118,6 +131,7 @@ function cfStempeluhr_(ss, von, heute, out, hinweise, diag) {
         const b = cfMin_(z[ix[0]]);
         if (b == null) return;
         hatSchicht = true;
+        rec.schichten++;
         const e = cfMin_(z[ix[1]]);
         const schichtNr = n + 1;
         if (diag.beispiele.length < 6) diag.beispiele.push({ tab: name, datum: z[0], schicht: schichtNr, beginn: z[ix[0]], ende: z[ix[1]], pause: z[ix[2]] });
@@ -145,6 +159,7 @@ function cfStempeluhr_(ss, von, heute, out, hinweise, diag) {
         nettoTag += brutto - pause;
         anwesendTag += brutto;
         pauseTag += pause;
+        rec.brutto += brutto;
       });
 
       if (hatSchicht && nettoTag > CF_LANGER_TAG_MIN) {
@@ -161,8 +176,7 @@ function cfStempeluhr_(ss, von, heute, out, hinweise, diag) {
 }
 
 // ── OFFENE LEISTUNGEN (Leistungserfassung) ──────────────────────────────────────
-function cfOffeneLeistungen_(ss, von, heute, out) {
-  const liste = prLeistungen_(ss, '', von, heute, []);
+function cfOffeneLeistungen_(liste, heute, out) {
   liste.forEach(function (l) {
     if (!l.offen) return;
     const tag = l.start.slice(0, 10);
@@ -171,6 +185,50 @@ function cfOffeneLeistungen_(ss, von, heute, out) {
       'Leistung ohne Ende',
       l.mitarbeiter + ' hat am ' + cfDatumKurz_(tag) + ' um ' + l.start.slice(11) + ' Uhr „' + (l.kategorie || 'Leistung') + '" gestartet' +
         (l.projekt ? ' (' + l.projekt + ')' : ' (ohne Projekt)') + ' und nicht beendet.', l.start));
+  });
+}
+
+// ── ABGLEICH Zeiterfassung ↔ Leistungserfassung (nur vergangene Tage) ──────────────
+//  • Leistung ohne Arbeitszeit: Leistung gebucht, aber an dem Tag nichts gestempelt (Einstempeln vergessen?)
+//  • Arbeitszeit ohne Leistung: an einem Arbeitstag gestempelt (abgeschlossene Schicht), aber keine Leistung gebucht
+// Verglichen wird nur, wenn der Name in der Leistungserfassung einem Mitarbeiter-Tab entspricht (Annahme A6).
+function cfAbgleich_(stempel, leistungen, heute, out, hinweise, diag) {
+  const tabs = {};
+  diag.mitarbeiterTabs.forEach(function (n) { tabs[prNorm_(n).toLowerCase()] = n; });
+
+  const le = {};          // Leistung je Mitarbeiter und Tag
+  const unbekannt = {};
+  leistungen.forEach(function (l) {
+    const tag = l.start.slice(0, 10);
+    if (tag >= heute) return;
+    const k = prNorm_(l.mitarbeiter).toLowerCase();
+    if (!tabs[k]) { unbekannt[prNorm_(l.mitarbeiter)] = true; return; }
+    const key = k + '|' + tag;
+    const x = le[key] || (le[key] = { name: tabs[k], datum: tag, anzahl: 0 });
+    x.anzahl++;
+  });
+  const fremde = Object.keys(unbekannt);
+  if (fremde.length) {
+    hinweise.push('Leistungen von ' + fremde.join(', ') + ' lassen sich keinem Mitarbeiter-Tab zuordnen (Schreibweise?) und fehlen im Abgleich mit der Zeiterfassung.');
+  }
+
+  Object.keys(le).forEach(function (key) {
+    const x = le[key], s = stempel[key];
+    if (s && s.schichten > 0) return;
+    const tagArt = s && s.typ !== 'arbeitstag' && s.typText ? ' (der Tag ist als „' + s.typText + '“ eingetragen)' : '';
+    out.push(cfEreignis_('leistung_ohne_zeit', 'warnung', x.datum, '', x.name, '',
+      'Leistung ohne Arbeitszeit',
+      x.name + ' hat am ' + cfDatumKurz_(x.datum) + ' ' + x.anzahl + (x.anzahl === 1 ? ' Leistung' : ' Leistungen') +
+        ' gebucht, aber keine Arbeitszeit gestempelt' + tagArt + '.', ''));
+  });
+
+  Object.keys(stempel).forEach(function (key) {
+    const s = stempel[key];
+    if (s.typ !== 'arbeitstag' || s.datum >= heute || s.brutto <= 0) return;
+    if (le[key]) return;
+    out.push(cfEreignis_('zeit_ohne_leistung', 'warnung', s.datum, '', s.name, '',
+      'Arbeitszeit ohne Leistung',
+      s.name + ' hat am ' + cfDatumKurz_(s.datum) + ' ' + cfStdMin_(s.brutto) + ' Std. gestempelt, aber keine Leistung gebucht.', ''));
   });
 }
 
@@ -197,7 +255,8 @@ function cfMehraufwand_(ss, von, heute, out) {
 // ── HILFSFUNKTIONEN (Präfix cf) ─────────────────────────────────────────────────
 // Woher ein Ereignis stammt (wird in der Chef-Seite als Herkunft angezeigt)
 const CF_QUELLE = { pause_kurz: 'Zeiterfassung', schicht_offen: 'Zeiterfassung', lange_zeit: 'Zeiterfassung',
-                    leistung_offen: 'Leistungserfassung', mehraufwand: 'Mehraufwand' };
+                    leistung_offen: 'Leistungserfassung', mehraufwand: 'Mehraufwand',
+                    leistung_ohne_zeit: 'Abgleich', zeit_ohne_leistung: 'Abgleich' };
 function cfEreignis_(typ, schwere, datum, zeit, mitarbeiter, projekt, titel, text, schluessel) {
   return { id: [typ, mitarbeiter, datum, schluessel].join('|'), typ: typ, schwere: schwere, quelle: CF_QUELLE[typ] || '', datum: datum, zeit: zeit || '',
            mitarbeiter: mitarbeiter, projekt: projekt || '', titel: titel, text: text };
