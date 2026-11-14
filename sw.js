@@ -1,6 +1,6 @@
 // ── GARTEN HOCH 3 – Service Worker ────────────────────────────────────────────
 // Version hier hochzählen bei jedem Update → löst automatisches Update aus
-const CACHE_VERSION = 'gh3-v71';
+const CACHE_VERSION = 'gh3-v72';
 const CACHE_FILES = [
   './zeiterfassung.html',
   './baustellenbericht.html',

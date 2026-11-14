@@ -56,6 +56,16 @@
   .src{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;border-radius:999px;background:#EEF2FF;color:var(--indigo)}
   .note{font-size:12px;border-radius:10px;padding:9px 12px;margin-bottom:10px;line-height:1.45}
   .note.warn{background:var(--orange-light);color:#9A3412}
+  .btn-row{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 6px}
+  .btn-primary{padding:11px 16px;background:var(--indigo);color:#fff;border:none;border-radius:10px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer}
+  .btn-primary:disabled{opacity:.45}
+  details.personen{background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:10px 14px;margin:2px 0 12px}
+  details.personen summary{font-size:13px;font-weight:700;cursor:pointer}
+  .person-row{display:flex;align-items:center;gap:10px;font-size:13px;padding:8px 0;border-top:1px solid var(--border);cursor:pointer}
+  .person-row:first-of-type{margin-top:8px}
+  .person-row input{width:18px;height:18px;flex:none}
+  .person-row span:first-of-type{font-weight:600}
+  .person-n{margin-left:auto;font-size:11px;color:var(--muted);white-space:nowrap}
   .empty{text-align:center;color:var(--muted);font-size:13px;padding:22px 10px;background:var(--surface);border:1.5px dashed var(--border);border-radius:12px}
   .spinner{text-align:center;color:var(--muted);font-size:13px;padding:30px 0}
   pre.diag{font-size:11px;background:#111827;color:#E5E7EB;border-radius:10px;padding:12px;overflow:auto;margin-top:16px;white-space:pre-wrap}
@@ -89,6 +99,16 @@
     <div class="chip-group" id="zrChips"></div>
     <div class="chip-group" id="typChips"></div>
     <label class="checkrow"><input type="checkbox" id="nurNeu"> Nur ungelesene anzeigen</label>
+    <details class="personen" id="personenBox">
+      <summary id="personenTitel">👥 Personen ausblenden</summary>
+      <div id="personenListe"></div>
+      <div class="card-sub" style="margin-top:8px">Ausgeblendete Personen erscheinen weder in der Liste noch in der Mail. Die Auswahl gilt nur auf diesem Gerät.</div>
+    </details>
+    <div class="btn-row">
+      <button class="btn-primary" id="btnMail" disabled onclick="mailVorbereiten()">✉️ Mail vorbereiten</button>
+      <button class="btn-secondary" id="btnKopie" disabled onclick="textKopieren()">📋 Text kopieren</button>
+    </div>
+    <div class="card-sub" style="margin:0 0 4px">Die Mail enthält genau das, was unten angezeigt wird (Zeitraum, Filter, ausgeblendete Personen).</div>
   </div>
 
   <div id="status"></div>
@@ -110,8 +130,12 @@ const ICON = { pause_kurz:'☕', schicht_offen:'🚪', leistung_offen:'⏱️', 
 const KEY_GELESEN = 'gh3_chef_gelesen';
 const KEY_TAGE = 'gh3_chef_tage';
 const KEY_TYP = 'gh3_chef_typ';
+const KEY_AUS = 'gh3_chef_ausgeblendet';
+// Standardmäßig ausgeblendet (Namensbestandteil, Groß-/Kleinschreibung egal). Weitere Personen, z. B. der Chef, lassen sich unter „Personen ausblenden“ abhaken.
+const AUS_STANDARD = ['domenico', 'ann-kathrin', 'annkathrin', 'ricarda'];
 
-let tage = 7, typ = 'alle', daten = null, gelesen = {}, geladenUm = 0;
+let tage = 7, typ = 'alle', daten = null, gelesen = {}, geladenUm = 0, ausListe = null;
+try{ const a = JSON.parse(localStorage.getItem(KEY_AUS)); if(Array.isArray(a)) ausListe = a.map(x => String(x).toLowerCase()); }catch(e){}
 try{ const g = JSON.parse(localStorage.getItem(KEY_GELESEN) || '{}'); if(g && typeof g === 'object' && !Array.isArray(g)) gelesen = g; }catch(e){}
 try{ const t = parseInt(localStorage.getItem(KEY_TAGE), 10); if(ZEITRAEUME.some(z => z.t === t)) tage = t; }catch(e){}
 try{ const k = localStorage.getItem(KEY_TYP); if(TYPEN.some(z => z.k === k)) typ = k; }catch(e){}
@@ -124,6 +148,95 @@ function fmtDatum(iso){
 function toast(msg){
   const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+// ── PERSONEN AUSBLENDEN ───────────────────────────────────────────────────────
+// Eintrag der Standardliste trifft per Namensbestandteil, selbst abgehakte Personen nur auf den genauen Namen
+// (sonst würde „Anna“ auch „Hanna“ ausblenden).
+function nameKey(n){ return String(n == null ? '' : n).trim().toLowerCase(); }
+function aktiveAus(){ return ausListe || AUS_STANDARD; }
+function trifft(k, x){ return k === x || (AUS_STANDARD.indexOf(x) >= 0 && k.indexOf(x) >= 0); }
+function istAus(name){ const k = nameKey(name); return !!k && aktiveAus().some(x => trifft(k, x)); }
+function setzeAus(name, aus){
+  const k = nameKey(name);
+  if(!k) return;
+  let liste = aktiveAus().slice();
+  if(aus){ if(!liste.some(x => trifft(k, x))) liste.push(k); }
+  else liste = liste.filter(x => !trifft(k, x));
+  ausListe = liste;
+  try{ localStorage.setItem(KEY_AUS, JSON.stringify(ausListe)); }catch(e){}
+  render();
+}
+function renderPersonen(){
+  const zaehler = {};
+  ((daten && daten.ereignisse) || []).forEach(e => { if(e.mitarbeiter) zaehler[e.mitarbeiter] = (zaehler[e.mitarbeiter] || 0) + 1; });
+  const namen = Object.keys(zaehler).sort((a, b) => a.localeCompare(b, 'de'));
+  const aus = namen.filter(istAus).length;
+  document.getElementById('personenTitel').textContent = '👥 Personen ausblenden' + (aus ? ' (' + aus + ' ausgeblendet)' : '');
+  document.getElementById('personenListe').innerHTML = namen.length
+    ? namen.map(n => `<label class="person-row"><input type="checkbox" data-n="${esc(n)}" ${istAus(n) ? 'checked' : ''} onchange="setzeAus(this.dataset.n, this.checked)"><span>${esc(n)}</span><span class="person-n">${zaehler[n]} ${zaehler[n] === 1 ? 'Meldung' : 'Meldungen'}</span></label>`).join('')
+    : '<div class="card-sub">Keine Meldungen im gewählten Zeitraum.</div>';
+}
+
+// ── ANSICHT (nach Personenfilter und „nur ungelesen") ─────────────────────────
+function ansicht(){
+  const alle = ((daten && daten.ereignisse) || []).filter(e => !istAus(e.mitarbeiter));
+  const nurNeu = document.getElementById('nurNeu').checked;
+  const sicht = e => !nurNeu || !gelesen[e.id];
+  const warn = alle.filter(e => e.schwere === 'warnung');
+  const info = alle.filter(e => e.schwere === 'hinweis');
+  return { alle, warn, info, ungelesen: alle.filter(e => !gelesen[e.id]).length, warnSicht: warn.filter(sicht), infoSicht: info.filter(sicht) };
+}
+
+// ── MAIL ──────────────────────────────────────────────────────────────────────
+function isoDe(iso){ return iso.slice(8,10) + '.' + iso.slice(5,7) + '.' + iso.slice(0,4); }
+// Genau die Einträge, die gerade angezeigt werden, nach Mitarbeiter und Datum sortiert
+function mailListe(){
+  const a = ansicht();
+  const liste = [].concat(typ !== 'hinweis' ? a.warnSicht : [], typ !== 'warnung' ? a.infoSicht : []);
+  return liste.slice().sort((x, y) =>
+    (x.mitarbeiter || '').localeCompare(y.mitarbeiter || '', 'de') || (x.datum < y.datum ? -1 : x.datum > y.datum ? 1 : 0) || (x.zeit || '').localeCompare(y.zeit || ''));
+}
+function mailText(liste){
+  const zeitraum = daten.von === daten.heute ? isoDe(daten.heute) : isoDe(daten.von).slice(0, 6) + '–' + isoDe(daten.heute);
+  const zeilen = [];
+  let vorher = null;
+  liste.forEach(e => {
+    if(vorher !== null && e.mitarbeiter !== vorher) zeilen.push('');
+    vorher = e.mitarbeiter;
+    zeilen.push('• ' + e.text);
+  });
+  const hatWarnung = liste.some(e => e.schwere === 'warnung');
+  const text = 'Hallo,\n\nfür den Zeitraum ' + zeitraum + ' gibt es folgende Meldungen:\n\n' + zeilen.join('\n') +
+    '\n\n' + (hatWarnung ? 'Bitte kurz prüfen und bei Bedarf nachtragen.\n\n' : '') + 'Viele Grüße';
+  return { betreff: 'Meldungen Zeiterfassung und Leistungen – ' + zeitraum, text };
+}
+function mailVorbereiten(){
+  const liste = mailListe();
+  if(!liste.length){ toast('Keine Meldungen für die Mail'); return; }
+  const m = mailText(liste);
+  const url = 'mailto:?subject=' + encodeURIComponent(m.betreff) + '&body=' + encodeURIComponent(m.text.replace(/\n/g, '\r\n'));
+  if(url.length > 1900) toast('Langer Text – bleibt die Mail leer, bitte „Text kopieren“ nutzen');
+  window.location.href = url;
+}
+async function textKopieren(){
+  const liste = mailListe();
+  if(!liste.length){ toast('Keine Meldungen zum Kopieren'); return; }
+  const m = mailText(liste);
+  const gesamt = 'Betreff: ' + m.betreff + '\n\n' + m.text;
+  try{
+    await navigator.clipboard.writeText(gesamt);
+    toast('Text kopiert');
+  }catch(e){
+    try{
+      const ta = document.createElement('textarea');
+      ta.value = gesamt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      toast(ok ? 'Text kopiert' : 'Kopieren nicht möglich');
+    }catch(e2){ toast('Kopieren nicht möglich'); }
+  }
 }
 
 function renderChips(){
@@ -183,12 +296,9 @@ function toggleGelesen(id){
 function render(){
   const wrap = document.getElementById('inhalt');
   if(!daten){ wrap.innerHTML = ''; return; }
-  const alle = daten.ereignisse || [];
-  const warn = alle.filter(e => e.schwere === 'warnung');
-  const info = alle.filter(e => e.schwere === 'hinweis');
-  const ungelesen = alle.filter(e => !gelesen[e.id]).length;
-  const nurNeu = document.getElementById('nurNeu').checked;
-  const sicht = e => !nurNeu || !gelesen[e.id];
+  renderPersonen();
+  const { warn, info, ungelesen, warnSicht, infoSicht } = ansicht();
+  document.getElementById('btnMail').disabled = document.getElementById('btnKopie').disabled = mailListe().length === 0;
 
   let html = '';
   (daten.hinweise || []).forEach(h => { html += '<div class="note warn">⚠️ ' + esc(h) + '</div>'; });
@@ -199,8 +309,8 @@ function render(){
   </div>`;
 
   const bloecke = [];
-  if(typ !== 'hinweis') bloecke.push({ titel:'⚠️ Warnungen', liste:warn.filter(sicht), leer:'✅ Keine Warnungen im gewählten Zeitraum.' });
-  if(typ !== 'warnung') bloecke.push({ titel:'ℹ️ Hinweise', liste:info.filter(sicht), leer:'Keine gemeldeten Mehraufwände im gewählten Zeitraum.' });
+  if(typ !== 'hinweis') bloecke.push({ titel:'⚠️ Warnungen', liste:warnSicht, leer:'✅ Keine Warnungen im gewählten Zeitraum.' });
+  if(typ !== 'warnung') bloecke.push({ titel:'ℹ️ Hinweise', liste:infoSicht, leer:'Keine gemeldeten Mehraufwände im gewählten Zeitraum.' });
   bloecke.forEach(b => {
     html += `<div class="section-title">${b.titel} (${b.liste.length})</div>`;
     html += b.liste.length ? b.liste.map(ereignisKarte).join('') : `<div class="empty">${b.leer}</div>`;
